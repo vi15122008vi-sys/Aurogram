@@ -1,0 +1,46 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+backend/.env
+web/.env
+android/local.properties
+
+# Telegram sessions and runtime databases
+*.session
+*.session-journal
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+sessions/
+cache_data/
+media_data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Web dependencies and output
+node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Android / Gradle output
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+
+# Editors and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,14 @@
+{
+  "domains": [
+    "youtube.com", "youtu.be", "github.com", "gitlab.com", "habr.com", "wikipedia.org",
+    "telegram.org", "t.me", "telegram.me", "google.com", "googleapis.com", "gstatic.com",
+    "docs.google.com", "drive.google.com", "notion.so", "figma.com", "vercel.com",
+    "cloudflare.com", "pages.dev", "github.io", "medium.com", "substack.com",
+    "reddit.com", "stackoverflow.com", "stackexchange.com", "npmjs.com", "pypi.org",
+    "docker.com", "hub.docker.com", "apple.com", "microsoft.com", "office.com",
+    "linkedin.com", "x.com", "twitter.com", "instagram.com", "facebook.com", "fb.com",
+    "vk.com", "ok.ru", "yandex.ru", "ya.ru", "mail.ru", "rambler.ru", "rutube.ru",
+    "twitch.tv", "spotify.com", "soundcloud.com", "vimeo.com", "dribbble.com",
+    "behance.net", "producthunt.com", "arxiv.org", "doi.org", "nist.gov", "mozilla.org"
+  ]
+}

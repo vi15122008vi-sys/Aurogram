@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block content %}
+<dl class="grid gap-x-8 rounded-xl border border-white/10 bg-zinc-900/50 p-5 sm:grid-cols-[220px_1fr]">{% for key, value in safe_settings.items() %}<dt class="border-b border-white/5 py-3 text-sm text-zinc-500">{{ key }}</dt><dd class="border-b border-white/5 py-3 font-mono text-sm">{{ value }}</dd>{% endfor %}</dl>
+{% endblock %}

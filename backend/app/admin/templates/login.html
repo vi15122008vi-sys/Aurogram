@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход · Aurogram</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body class="grid min-h-screen place-items-center bg-zinc-950 px-4 text-zinc-100">
+  <main class="w-full max-w-sm">
+    <div class="mb-8 flex items-center gap-3 text-xl font-semibold"><span class="grid h-9 w-9 place-items-center rounded-lg bg-indigo-500">A</span>Aurogram</div>
+    <form method="post" action="/admin/login" class="space-y-4 rounded-xl border border-white/10 bg-zinc-900/70 p-6">
+      <div><h1 class="text-lg font-semibold">Вход в панель</h1><p class="mt-1 text-sm text-zinc-500">Введите учётные данные администратора.</p></div>
+      {% if error %}<p role="alert" class="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{{ error }}</p>{% endif %}
+      <label class="block text-sm text-zinc-400">Логин<input name="username" autocomplete="username" required class="mt-1 w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-2 text-white"></label>
+      <label class="block text-sm text-zinc-400">Пароль<input name="password" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-2 text-white"></label>
+      <button class="w-full rounded-lg bg-indigo-500 px-3 py-2 font-medium text-white hover:bg-indigo-400">Войти</button>
+    </form>
+  </main>
+</body>
+</html>

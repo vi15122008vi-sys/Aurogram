@@ -1,0 +1,348 @@
+from __future__ import annotations
+
+import csv
+import io
+import json
+import re
+import secrets
+from typing import Any, Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+
+from app.antispam.checker import check_message
+from app.antispam.log import metrics_24h, read_log
+from app.antispam.settings import dump_settings, load_channel_settings
+from app.antispam.stopwords import add_history, ensure_seeded, list_words, load_builtin
+from app.database import execute, fetchall, fetchone
+from app.deps import get_current_account
+from app.models import (
+    AntiSpamSettings,
+    AntispamTestRequest,
+    ChannelOut,
+    StopWord,
+    WordCreate,
+    WordImport,
+    WordPatch,
+)
+from app.telegram.channels import get_channel_full, list_channels
+
+router = APIRouter(prefix="/channels", tags=["channels"])
+
+
+def _validate_category(category: str) -> None:
+    categories = set(load_builtin().get("categories", {})) | {"custom"}
+    if category not in categories:
+        raise HTTPException(status_code=422, detail="Неизвестная категория стоп-слова")
+
+
+async def _channel_settings(account_id: str, channel_id: int) -> AntiSpamSettings:
+    row = await fetchone(
+        "SELECT antispam_json FROM channel_settings WHERE account_id = ? AND channel_id = ?",
+        (account_id, channel_id),
+    )
+    return load_channel_settings(row["antispam_json"] if row else None)
+
+
+@router.get("", response_model=list[ChannelOut])
+async def channels(
+    account: dict[str, Any] = Depends(get_current_account),
+) -> list[ChannelOut]:
+    return await list_channels(account)
+
+
+@router.get("/{channel_id}")
+async def channel(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    return await get_channel_full(account, channel_id)
+
+
+@router.get("/{channel_id}/antispam", response_model=AntiSpamSettings)
+async def get_antispam_settings(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> AntiSpamSettings:
+    return await _channel_settings(account["id"], channel_id)
+
+
+@router.put("/{channel_id}/antispam", response_model=AntiSpamSettings)
+async def update_antispam_settings(
+    channel_id: int,
+    payload: AntiSpamSettings,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> AntiSpamSettings:
+    await execute(
+        """
+        INSERT INTO channel_settings (account_id, channel_id, antispam_json)
+        VALUES (?, ?, ?)
+        ON CONFLICT(account_id, channel_id) DO UPDATE SET
+            antispam_json = excluded.antispam_json,
+            updated_at = datetime('now')
+        """,
+        (account["id"], channel_id, dump_settings(payload)),
+    )
+    return payload
+
+
+@router.post("/{channel_id}/antispam/test")
+async def test_antispam(
+    channel_id: int,
+    payload: AntispamTestRequest,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    settings = await _channel_settings(account["id"], channel_id)
+    message = type(
+        "TestMessage",
+        (),
+        {"message": payload.text, "raw_text": payload.text, "sender_id": secrets.randbits(63)},
+    )()
+    verdict = await check_message(
+        message,
+        settings,
+        account_id=account["id"],
+        channel_id=channel_id,
+    )
+    return verdict.model_dump()
+
+
+@router.get("/{channel_id}/stopwords", response_model=list[StopWord])
+async def stopwords(
+    channel_id: int,
+    category: str | None = None,
+    q: str | None = Query(default=None, max_length=100),
+    enabled: bool | None = None,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> list[StopWord]:
+    settings = await _channel_settings(account["id"], channel_id)
+    await ensure_seeded(account["id"], channel_id, settings.level.value)
+    return await list_words(account["id"], channel_id, category=category, q=q, enabled=enabled)
+
+
+@router.get("/{channel_id}/stopwords/builtin")
+async def builtin_stopwords(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    settings = await _channel_settings(account["id"], channel_id)
+    data = load_builtin()
+    return {
+        "version": data.get("version", 1),
+        "level": settings.level.value,
+        "categories": data.get("categories", {}),
+    }
+
+
+@router.get("/{channel_id}/stopwords/export")
+async def export_stopwords(
+    channel_id: int,
+    format: Literal["json", "txt"] = Query(default="json"),
+    account: dict[str, Any] = Depends(get_current_account),
+) -> Response:
+    settings = await _channel_settings(account["id"], channel_id)
+    await ensure_seeded(account["id"], channel_id, settings.level.value)
+    words = await list_words(account["id"], channel_id)
+    if format == "json":
+        content = json.dumps(
+            {
+                "version": 1,
+                "words": [word.model_dump(mode="json") for word in words],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        media_type = "application/json"
+    else:
+        content = "\n".join(word.word for word in words if word.enabled)
+        if content:
+            content += "\n"
+        media_type = "text/plain"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="stopwords-{channel_id}.{format}"'},
+    )
+
+
+@router.post("/{channel_id}/stopwords", response_model=StopWord, status_code=201)
+async def create_stopword(
+    channel_id: int,
+    payload: WordCreate,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> StopWord:
+    word = payload.word.strip()
+    if not word or len(word) > 200:
+        raise HTTPException(status_code=422, detail="Длина стоп-слова должна быть от 1 до 200 символов")
+    category = payload.category if payload.category != "custom" else "custom"
+    _validate_category(category)
+    if payload.is_regex:
+        try:
+            re.compile(word)
+        except re.error as exc:
+            raise HTTPException(status_code=422, detail=f"Некорректное регулярное выражение: {exc}") from exc
+    await execute(
+        """
+        INSERT OR IGNORE INTO antispam_stopwords
+        (account_id, channel_id, word, category, enabled, is_regex, is_builtin, created_by)
+        VALUES (?, ?, ?, ?, 1, ?, 0, ?)
+        """,
+        (account["id"], channel_id, word, category, int(payload.is_regex), account.get("username")),
+    )
+    row = await fetchone(
+        "SELECT * FROM antispam_stopwords WHERE account_id = ? AND channel_id = ? AND word = ? AND category = ?",
+        (account["id"], channel_id, word, category),
+    )
+    if row is None:
+        raise HTTPException(status_code=500, detail="Не удалось сохранить стоп-слово")
+    await add_history(account["id"], channel_id, "add", word, account.get("username"))
+    return StopWord(
+        id=row["id"], word=row["word"], category=row["category"], enabled=bool(row["enabled"]),
+        is_regex=bool(row["is_regex"]), is_builtin=bool(row["is_builtin"]),
+        created_at=row["created_at"], created_by=row["created_by"],
+    )
+
+
+@router.patch("/{channel_id}/stopwords/{word_id}", response_model=StopWord)
+async def update_stopword(
+    channel_id: int,
+    word_id: int,
+    payload: WordPatch,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> StopWord:
+    row = await fetchone(
+        "SELECT * FROM antispam_stopwords WHERE id = ? AND account_id = ? AND channel_id = ?",
+        (word_id, account["id"], channel_id),
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Стоп-слово не найдено")
+    updates = payload.model_dump(exclude_unset=True)
+    if row["is_builtin"] and any(key in updates for key in ("word", "category")):
+        raise HTTPException(status_code=409, detail="Встроенное стоп-слово можно только включить или отключить")
+    if "word" in updates:
+        updates["word"] = str(updates["word"]).strip()
+        if not updates["word"] or len(updates["word"]) > 200:
+            raise HTTPException(status_code=422, detail="Недопустимая длина стоп-слова")
+    if "category" in updates:
+        _validate_category(str(updates["category"]))
+    if updates:
+        columns = ", ".join(f"{key} = ?" for key in updates)
+        values = [int(value) if key == "enabled" else value for key, value in updates.items()]
+        await execute(
+            f"UPDATE antispam_stopwords SET {columns} WHERE id = ? AND account_id = ? AND channel_id = ?",
+            (*values, word_id, account["id"], channel_id),
+        )
+        await add_history(account["id"], channel_id, "update", str(row["word"]), account.get("username"))
+    updated = await fetchone("SELECT * FROM antispam_stopwords WHERE id = ?", (word_id,))
+    return StopWord(
+        id=updated["id"], word=updated["word"], category=updated["category"],
+        enabled=bool(updated["enabled"]), is_regex=bool(updated["is_regex"]),
+        is_builtin=bool(updated["is_builtin"]), created_at=updated["created_at"],
+        created_by=updated["created_by"],
+    )
+
+
+@router.delete("/{channel_id}/stopwords/{word_id}", status_code=204)
+async def delete_stopword(
+    channel_id: int,
+    word_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> None:
+    row = await fetchone(
+        "SELECT word, is_builtin FROM antispam_stopwords WHERE id = ? AND account_id = ? AND channel_id = ?",
+        (word_id, account["id"], channel_id),
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Стоп-слово не найдено")
+    if row["is_builtin"]:
+        raise HTTPException(status_code=409, detail="Встроенное стоп-слово нельзя удалить, только отключить")
+    await execute(
+        "DELETE FROM antispam_stopwords WHERE id = ? AND account_id = ? AND channel_id = ?",
+        (word_id, account["id"], channel_id),
+    )
+    await add_history(account["id"], channel_id, "delete", row["word"], account.get("username"))
+
+
+@router.post("/{channel_id}/stopwords/import")
+async def import_stopwords(
+    channel_id: int,
+    payload: WordImport,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, int]:
+    _validate_category(payload.category)
+    if len(payload.data) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Файл импорта слишком большой")
+    try:
+        if payload.format == "json":
+            content = json.loads(payload.data)
+            entries = content if isinstance(content, list) else content.get("words", [])
+        elif payload.format == "csv":
+            entries = [row[0] for row in csv.reader(io.StringIO(payload.data)) if row]
+        else:
+            entries = payload.data.splitlines()
+    except (json.JSONDecodeError, AttributeError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail="Не удалось разобрать импорт") from exc
+    if not isinstance(entries, list):
+        raise HTTPException(status_code=422, detail="Импорт должен содержать список слов")
+    if len(entries) > 10_000:
+        raise HTTPException(status_code=413, detail="В одном импорте допускается не более 10000 слов")
+    channel_settings = await _channel_settings(account["id"], channel_id)
+    await ensure_seeded(account["id"], channel_id, channel_settings.level.value)
+    normalized: dict[tuple[str, str], tuple[bool, bool]] = {}
+    for entry in entries:
+        if isinstance(entry, dict):
+            word = str(entry.get("word", "")).strip()
+            category = str(entry.get("category") or payload.category)
+            enabled = bool(entry.get("enabled", True))
+            is_regex = bool(entry.get("is_regex", word.startswith("re:")))
+        else:
+            word = str(entry).strip()
+            category = payload.category
+            enabled = True
+            is_regex = word.startswith("re:")
+        if not word or len(word) > 200:
+            continue
+        _validate_category(category)
+        if is_regex:
+            try:
+                re.compile(word[3:] if word.startswith("re:") else word)
+            except re.error as exc:
+                raise HTTPException(status_code=422, detail="Импорт содержит некорректное регулярное выражение") from exc
+        normalized[(word, category)] = (enabled, is_regex)
+
+    before_words = await list_words(account["id"], channel_id)
+    before = {(word.word, word.category) for word in before_words}
+    for (word, category), (enabled, is_regex) in normalized.items():
+        await execute(
+            """
+            INSERT OR IGNORE INTO antispam_stopwords
+            (account_id, channel_id, word, category, enabled, is_regex, is_builtin, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+            """,
+            (
+                account["id"], channel_id, word, category, int(enabled),
+                int(is_regex), account.get("username"),
+            ),
+        )
+    after_words = await list_words(account["id"], channel_id)
+    after = {(word.word, word.category) for word in after_words}
+    imported = len(after - before)
+    if imported:
+        await add_history(account["id"], channel_id, "import", str(imported), account.get("username"))
+    return {"imported": imported, "skipped": len(normalized) - imported}
+
+
+@router.get("/{channel_id}/antispam/log")
+async def antispam_log(
+    channel_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    account: dict[str, Any] = Depends(get_current_account),
+) -> list[dict[str, Any]]:
+    return await read_log(account["id"], channel_id, limit)
+
+
+@router.get("/{channel_id}/antispam/metrics")
+async def antispam_metrics(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, int]:
+    return await metrics_24h(account["id"], channel_id)

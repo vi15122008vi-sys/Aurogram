@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0a0b">
+  <title>{{ title|default('Aurogram Admin') }} · Aurogram</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/json-enc.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+</head>
+<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+  <div class="min-h-screen lg:grid lg:grid-cols-[220px_1fr]">
+    <aside class="border-b border-white/10 bg-zinc-950 p-4 lg:min-h-screen lg:border-b-0 lg:border-r">
+      <a href="/admin" class="flex items-center gap-3 text-lg font-semibold">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500 text-sm">A</span>
+        Aurogram
+      </a>
+      <nav class="mt-8 grid grid-cols-2 gap-1 lg:grid-cols-1">
+        <a href="/admin" class="rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5">Обзор</a>
+        {% for key, label in pages.items() %}
+        <a href="/admin/{{ key }}" class="rounded-lg px-3 py-2 text-sm {{ 'bg-white/10 text-white' if page == key else 'text-zinc-400 hover:bg-white/5 hover:text-white' }}">{{ label }}</a>
+        {% endfor %}
+      </nav>
+      <form method="post" action="/admin/logout" class="mt-8">
+        <button class="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-zinc-400 hover:bg-white/5">Выйти</button>
+      </form>
+    </aside>
+    <main class="min-w-0 p-5 md:p-8">
+      <header class="mb-7 flex items-center justify-between border-b border-white/10 pb-5">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-zinc-500">Aurogram / Admin</p>
+          <h1 class="mt-1 text-2xl font-semibold">{{ title|default('Обзор') }}</h1>
+        </div>
+        <span class="rounded-md border border-white/10 px-2 py-1 font-mono text-xs text-zinc-400">API :8000</span>
+      </header>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

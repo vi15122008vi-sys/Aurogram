@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid gap-3 sm:grid-cols-3">
+  {% for label, value in [('Аккаунты', account_count), ('Боты', bot_count), ('Каналы с настройками', channel_count)] %}
+  <div class="rounded-xl border border-white/10 bg-zinc-900/50 p-4"><p class="text-sm text-zinc-500">{{ label }}</p><p class="mt-2 font-mono text-2xl tabular-nums">{{ value }}</p></div>
+  {% endfor %}
+</section>
+<section class="mt-7 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+  <div><h2 class="mb-3 text-sm font-medium text-zinc-300">Недавние аккаунты</h2><div class="overflow-x-auto rounded-xl border border-white/10"><table class="w-full text-left text-sm"><thead class="bg-white/5 text-xs text-zinc-500"><tr><th class="p-3">Аккаунт</th><th class="p-3">Телефон</th><th class="p-3">Статус</th></tr></thead><tbody>{% for row in accounts %}<tr class="border-t border-white/5"><td class="p-3">{{ row.name or 'Без имени' }}</td><td class="p-3 font-mono text-zinc-400">{{ row.phone }}</td><td class="p-3">{{ row.auth_state }}</td></tr>{% else %}<tr><td colspan="3" class="p-4 text-zinc-500">Аккаунтов пока нет</td></tr>{% endfor %}</tbody></table></div></div>
+  <div><h2 class="mb-3 text-sm font-medium text-zinc-300">Listener</h2><div class="rounded-xl border border-white/10 bg-zinc-900/50 p-4"><p class="font-mono text-sm">{{ listener.status|default('нет heartbeat') }}</p><p class="mt-2 text-xs text-zinc-500">Последнее сообщение: {{ listener.last_message_at|default('—') }}</p></div></div>
+</section>
+{% endblock %}

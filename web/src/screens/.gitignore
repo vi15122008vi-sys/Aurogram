@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.DS_Store
+__pycache__/
+*.pyc
+*.session
+cache_data/
+media_data/
+*.db
+*.db-wal
+*.db-shm
