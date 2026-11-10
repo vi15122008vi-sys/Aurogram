@@ -125,6 +125,12 @@ export interface EditorPreview {
   max_length?: number;
 }
 
+export interface EditorCapabilities {
+  headings: boolean;
+  premium_required_for: string[];
+  notice: string | null;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -284,6 +290,7 @@ export const api = {
     list: () => request<ChatRecord[]>("/chats"),
   },
   editor: {
+    capabilities: () => request<EditorCapabilities>("/editor/capabilities"),
     preview: (markdown: string) =>
       request<EditorPreview>("/editor/preview", { method: "POST", body: json({ markdown }) }),
     publish: (channelId: number, payload: { text: string; parse_mode: "md" | "html"; schedule_at: string | null }) =>

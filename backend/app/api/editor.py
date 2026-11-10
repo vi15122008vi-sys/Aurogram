@@ -17,8 +17,12 @@ router = APIRouter(prefix="/editor", tags=["editor"])
 
 
 @router.get("/capabilities")
-async def editor_capabilities(premium: bool = False) -> dict[str, Any]:
-    return capabilities(premium)
+async def editor_capabilities(
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    client = await get_client(account["id"], account)
+    telegram_user = await client.get_me()
+    return capabilities(bool(getattr(telegram_user, "premium", False)))
 
 
 @router.post("/preview")

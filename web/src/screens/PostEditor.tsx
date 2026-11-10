@@ -1,5 +1,5 @@
-import { useRef, useState, type FormEvent } from "react";
-import { Bold, Code2, Eye, Italic, Link2, Send, Timer } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Bold, Code2, Eye, Italic, Link2, List, Send, Sparkles, Timer, Underline } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { api, type EditorPreview } from "../lib/api";
 import { useI18n } from "../lib/i18n";
@@ -17,21 +17,58 @@ export function PostEditor({ channelId, onPublished }: PostEditorProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [premiumNotice, setPremiumNotice] = useState<string | null>(null);
+  const [premium, setPremium] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  function wrapSelection(marker: string) {
+  useEffect(() => {
+    let mounted = true;
+    api.editor.capabilities()
+      .then((capabilities) => { if (mounted) setPremium(capabilities.headings); })
+      .catch(() => { if (mounted) setPremium(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  function wrapSelection(before: string, after = before) {
     const input = inputRef.current;
     if (!input) return;
     const start = input.selectionStart;
     const end = input.selectionEnd;
     const selected = text.slice(start, end) || t("текст");
-    const next = `${text.slice(0, start)}${marker}${selected}${marker}${text.slice(end)}`;
+    const next = `${text.slice(0, start)}${before}${selected}${after}${text.slice(end)}`;
     setText(next);
     setPreview(null);
     requestAnimationFrame(() => {
       input.focus();
-      input.setSelectionRange(start + marker.length, start + marker.length + selected.length);
+      input.setSelectionRange(start + before.length, start + before.length + selected.length);
     });
+  }
+
+  function insertBlockPrefix(prefix: string) {
+    const input = inputRef.current;
+    if (!input) return;
+    const selectionStart = input.selectionStart;
+    const selectionEnd = input.selectionEnd;
+    const lineStart = text.lastIndexOf("\n", selectionStart - 1) + 1;
+    const nextLineBreak = text.indexOf("\n", selectionEnd);
+    const lineEnd = nextLineBreak < 0 ? text.length : nextLineBreak;
+    const content = text.slice(lineStart, lineEnd);
+    const next = `${text.slice(0, lineStart)}${prefix}${content}${text.slice(lineEnd)}`;
+    setText(next);
+    setPreview(null);
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(selectionStart + prefix.length, selectionEnd + prefix.length);
+    });
+  }
+
+  function insertHeading(level: 1 | 2 | 3) {
+    if (!premium) {
+      setPremiumNotice(t("Для отправки заголовков нужен Telegram Premium"));
+      return;
+    }
+    setPremiumNotice(null);
+    insertBlockPrefix(`${"#".repeat(level)} `);
   }
 
   function insertLink() {
@@ -71,6 +108,7 @@ export function PostEditor({ channelId, onPublished }: PostEditorProps) {
     setBusy(true);
     setError(null);
     setNotice(null);
+    setPremiumNotice(null);
     try {
       await api.editor.publish(channelId, {
         text,
@@ -105,10 +143,16 @@ export function PostEditor({ channelId, onPublished }: PostEditorProps) {
           <Eye size={14} /> {t("Предпросмотр")}
         </button>
       </div>
-      <div className="flex items-center gap-1 border-b border-line px-3 py-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2">
         <button type="button" title={t("Жирный")} aria-label={t("Жирный")} onClick={() => wrapSelection("**")} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink"><Bold size={16} /></button>
         <button type="button" title={t("Курсив")} aria-label={t("Курсив")} onClick={() => wrapSelection("_")} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink"><Italic size={16} /></button>
+        <button type="button" title={t("Подчёркивание")} aria-label={t("Подчёркивание")} onClick={() => wrapSelection("<u>", "</u>")} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink"><Underline size={16} /></button>
         <button type="button" title={t("Код")} aria-label={t("Код")} onClick={() => wrapSelection("`")} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink"><Code2 size={16} /></button>
+        <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
+        {([1, 2, 3] as const).map((level) => (
+          <button key={level} type="button" title={t(`Заголовок H${level}`)} aria-label={t(`Заголовок H${level}`)} onClick={() => insertHeading(level)} className={`grid size-8 place-items-center rounded-lg font-mono text-[10px] font-semibold transition ${premium ? "text-muted hover:bg-raised hover:text-ink" : "text-muted/70 hover:bg-accent/10 hover:text-accent"}`}>H{level}</button>
+        ))}
+        <button type="button" title={t("Маркированный список")} aria-label={t("Маркированный список")} onClick={() => insertBlockPrefix("- ")} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink"><List size={16} /></button>
         <button type="button" title={t("Ссылка")} aria-label={t("Ссылка")} onClick={insertLink} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink"><Link2 size={16} /></button>
         <span className={`ml-auto font-mono text-[10px] tabular-nums ${text.length > 32768 ? "text-danger" : "text-muted"}`}>{text.length.toLocaleString(locale === "ru" ? "ru-RU" : "en-US")} / 32,768</span>
       </div>
@@ -116,7 +160,7 @@ export function PostEditor({ channelId, onPublished }: PostEditorProps) {
         <textarea
           ref={inputRef}
           value={text}
-          onChange={(event) => { setText(event.target.value); setPreview(null); setNotice(null); }}
+          onChange={(event) => { setText(event.target.value); setPreview(null); setNotice(null); setPremiumNotice(null); }}
           maxLength={32768}
           rows={7}
           placeholder={t("Текст публикации…")}
@@ -126,6 +170,7 @@ export function PostEditor({ channelId, onPublished }: PostEditorProps) {
         {preview?.error && <p role="alert" className="mx-3 mb-3 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{t(preview.error)}</p>}
         {preview?.warnings?.map((warning) => <p key={warning} className="mx-4 mb-2 text-xs text-warning">{t(warning)}</p>)}
         {error && <p role="alert" className="mx-3 mb-3 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+        {premiumNotice && <div role="status" className="mx-3 mb-3 flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2.5 text-sm text-ink"><Sparkles size={16} className="mt-0.5 shrink-0 text-accent" /><span>{premiumNotice}</span></div>}
         {notice && <p role="status" className="mx-3 mb-3 rounded-lg border border-line bg-success/10 px-3 py-2 text-sm text-success">{notice}</p>}
         <div className="flex flex-col gap-3 border-t border-line p-3 sm:flex-row sm:items-center">
           <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line px-3 text-xs text-muted">
