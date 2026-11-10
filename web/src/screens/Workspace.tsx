@@ -6,6 +6,7 @@ import { Channels } from "./Channels";
 import { ChannelDetail } from "./ChannelDetail";
 import { MessageList } from "./MessageList";
 import { Settings } from "./Settings";
+import { ChatList, type ChatFilter } from "./ChatList";
 import { useI18n } from "../lib/i18n";
 
 interface WorkspaceProps {
@@ -39,9 +40,12 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   const [selectedChannel, setSelectedChannel] = useState<{ id: number; title: string; username: string | null; subscribers: number; posts_count: number } | null>(null);
   const [selectedChannelTab, setSelectedChannelTab] = useState<"posts" | "stats">("posts");
   const [selectedChat, setSelectedChat] = useState<ChatRecord | null>(null);
+  const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
+  const [archivingId, setArchivingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const chatMode = tab === "chats" && chatFilter === "archive" ? "archive" : "active";
 
   useEffect(() => {
     setSelectedChannel(null);
@@ -54,7 +58,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     let active = true;
     setLoading(true);
     setError(null);
-    const load = tab === "bots" ? api.bots.list() : api.chats.list();
+    const load = tab === "bots" ? api.bots.list() : api.chats.list(chatMode === "archive");
     load
       .then((items) => {
         if (active) setRows(items);
@@ -68,7 +72,20 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     return () => {
       active = false;
     };
-  }, [tab, reloadKey]);
+  }, [tab, reloadKey, chatMode]);
+
+  async function toggleChatArchive(chat: ChatRecord) {
+    setArchivingId(chat.id);
+    setError(null);
+    try {
+      await api.chats.archive(chat.id, chatFilter !== "archive");
+      setReloadKey((key) => key + 1);
+    } catch (cause) {
+      setError(t(cause instanceof Error ? cause.message : "Не удалось архивировать чат"));
+    } finally {
+      setArchivingId(null);
+    }
+  }
 
   if (tab === "channels") {
     return selectedChannel
@@ -84,14 +101,17 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     return <Settings accountName={account.name || account.phone} phone={account.phone} onLogout={onLogout} />;
   }
 
-  if (tab === "chats" && selectedChat) {
-    return (
-      <section className="animate-[rise-in_240ms_ease-out]">
-        <button type="button" onClick={() => setSelectedChat(null)} className="mb-4 inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface hover:text-ink"><ArrowLeft size={15} />{t("Чаты")}</button>
-        <div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("INBOX")} / {t(selectedChat.type)}</p><h1 className="mt-1 text-[25px] font-semibold">{selectedChat.title}</h1></div>
-        <MessageList chatId={selectedChat.id} allowSend />
-      </section>
-    );
+  if (tab === "chats") {
+    if (selectedChat) {
+      return (
+        <section className="animate-[rise-in_240ms_ease-out]">
+          <button type="button" onClick={() => setSelectedChat(null)} className="mb-4 inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface hover:text-ink"><ArrowLeft size={15} />{t("Чаты")}</button>
+          <div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("INBOX")} / {t(({ user: "Личный чат", group: "Группа", channel: "Канал", bot: "Бот" } as const)[selectedChat.type])}</p><h1 className="mt-1 text-[25px] font-semibold">{selectedChat.title}</h1></div>
+          <MessageList chatId={selectedChat.id} allowSend />
+        </section>
+      );
+    }
+    return <ChatList chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={(chat) => void toggleChatArchive(chat)} archivingId={archivingId} loading={loading} error={error} />;
   }
 
   const content = tabContent[tab];
@@ -116,7 +136,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
       </div>
       {error && <p role="alert" className="mt-5 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       {rows.length ? (
-        <div className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+        <div className="glass-panel mt-6 divide-y divide-line overflow-hidden rounded-2xl">
           {rows.map((item) => {
             const content = <>
               <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-raised text-muted"><Icon size={18} strokeWidth={1.7} /></span>
@@ -126,9 +146,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
               </span>
               {"unread" in item && item.unread > 0 && <span className="rounded-lg bg-accent/10 px-2 py-1 font-mono text-xs text-accent">{item.unread}</span>}
             </>;
-            return tab === "chats" && "type" in item
-              ? <button key={item.id} type="button" onClick={() => setSelectedChat(item)} className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-raised">{content}</button>
-              : <article key={item.id} className="flex items-center gap-3 p-3">{content}</article>;
+            return <article key={item.id} className="glass-hover flex items-center gap-3 p-3">{content}</article>;
           })}
         </div>
       ) : (

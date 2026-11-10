@@ -42,8 +42,10 @@ export interface ChatRecord {
   id: number;
   title: string;
   type: "user" | "group" | "channel" | "bot";
+  archived?: boolean;
   unread: number;
   last_message: string | null;
+  last_message_date?: string | null;
 }
 
 export interface ChannelDetails {
@@ -295,7 +297,12 @@ export const api = {
     list: () => request<BotRecord[]>("/bots"),
   },
   chats: {
-    list: () => request<ChatRecord[]>("/chats"),
+    list: (archived = false) => request<ChatRecord[]>(`/chats?archived=${archived}`),
+    archive: (chatId: number, archived: boolean) =>
+      request<{ chat_id: number; archived: boolean }>(`/chats/${chatId}/archive`, {
+        method: "PUT",
+        body: json({ archived }),
+      }),
   },
   editor: {
     capabilities: () => request<EditorCapabilities>("/editor/capabilities"),

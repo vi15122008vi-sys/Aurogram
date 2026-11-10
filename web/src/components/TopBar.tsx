@@ -9,7 +9,7 @@ interface TopBarProps {
 export function TopBar({ accountName, onLogout }: TopBarProps) {
   const { t } = useI18n();
   return (
-    <header className="sticky top-0 z-20 border-b border-border/80 bg-surface/75 shadow-[0_1px_0_rgb(255_255_255_/_2%)] backdrop-blur-2xl supports-[backdrop-filter]:bg-surface/60">
+    <header className="glass-panel sticky top-0 z-20 border-b border-border/80 bg-surface/55 shadow-[0_1px_0_rgb(255_255_255_/_2%)] backdrop-blur-glass">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-3 sm:px-5">
         <div className="group flex items-center gap-2.5 text-ink" aria-label="Aurogram">
           <span className="grid size-8 place-items-center rounded-[10px] border border-accent/25 bg-accent/10 shadow-[inset_0_1px_0_rgb(255_255_255_/_8%),0_0_14px_rgb(99_102_241_/_18%)] transition duration-200 group-hover:scale-105 group-hover:border-violet-400/40 group-hover:shadow-[inset_0_1px_0_rgb(255_255_255_/_10%),0_0_20px_rgb(139_92_246_/_38%)] motion-reduce:transition-none">
@@ -30,7 +30,7 @@ export function TopBar({ accountName, onLogout }: TopBarProps) {
           <span className="size-2 rounded-full bg-success" aria-label={t("Аккаунт активен")} title={t("Аккаунт активен")} />
           <button
             type="button"
-            className="grid size-9 place-items-center rounded-lg border border-transparent text-muted transition duration-200 hover:border-border hover:bg-surfaceRaised hover:text-ink"
+            className="glass-hover grid size-9 place-items-center rounded-lg border border-transparent text-muted transition duration-200 hover:border-border hover:bg-surfaceRaised hover:text-ink"
             onClick={onLogout}
             aria-label={t("Выйти из аккаунта")}
             title={t("Выйти")}

@@ -18,7 +18,7 @@ const items = [
 export function BottomNav({ active, onChange }: BottomNavProps) {
   const { t } = useI18n();
   return (
-    <nav aria-label={t("Основная навигация")} className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface/75 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_36px_rgb(0_0_0_/_12%)] backdrop-blur-2xl supports-[backdrop-filter]:bg-surface/60">
+    <nav aria-label={t("Основная навигация")} className="glass-panel fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface/55 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_36px_rgb(0_0_0_/_18%)] backdrop-blur-glass">
       <div className="mx-auto grid h-14 max-w-2xl grid-cols-4">
         {items.map(({ id, label, icon: Icon }) => {
           const selected = active === id;
@@ -29,7 +29,7 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
               aria-current={selected ? "page" : undefined}
               aria-label={t(label)}
               onClick={() => onChange(id)}
-              className={`relative mx-1 my-1 flex h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-medium transition duration-200 ${selected ? "bg-accent/10 text-accent" : "text-muted hover:bg-surfaceRaised/70 hover:text-ink"}`}
+              className={`glass-hover relative mx-1 my-1 flex h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-medium transition duration-200 ${selected ? "bg-accent/10 text-accent" : "text-muted hover:bg-surfaceRaised/70 hover:text-ink"}`}
             >
               <Icon size={18} strokeWidth={1.5} />
               <span>{t(label)}</span>

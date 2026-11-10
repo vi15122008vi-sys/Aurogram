@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from app.deps import get_current_account
+from app.database import execute, fetchall
 from app.models import ChatOut, MemberOut, MessageOut
 from app.telegram.chats import get_chat, list_chats
 from app.telegram.members import list_admins, list_members
@@ -19,12 +20,41 @@ class MessageCreate(BaseModel):
     parse_mode: str | None = "html"
 
 
+class ChatArchiveUpdate(BaseModel):
+    archived: bool
+
+
 @router.get("", response_model=list[ChatOut])
 async def chats(
     limit: int = Query(default=100, ge=1, le=200),
+    archived: bool = False,
     account: dict[str, Any] = Depends(get_current_account),
 ) -> list[ChatOut]:
-    return await list_chats(account, limit=limit)
+    rows = await fetchall(
+        "SELECT chat_id FROM archived_chats WHERE account_id = ?",
+        (account["id"],),
+    )
+    archived_ids = {int(row["chat_id"]) for row in rows}
+    return await list_chats(account, limit=limit, archived_ids=archived_ids, archived=archived)
+
+
+@router.put("/{chat_id}/archive")
+async def update_chat_archive(
+    chat_id: int,
+    payload: ChatArchiveUpdate,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, int | bool]:
+    if payload.archived:
+        await execute(
+            "INSERT OR IGNORE INTO archived_chats (account_id, chat_id) VALUES (?, ?)",
+            (account["id"], chat_id),
+        )
+    else:
+        await execute(
+            "DELETE FROM archived_chats WHERE account_id = ? AND chat_id = ?",
+            (account["id"], chat_id),
+        )
+    return {"chat_id": chat_id, "archived": payload.archived}
 
 
 @router.get("/{chat_id}", response_model=ChatOut)

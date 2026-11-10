@@ -83,6 +83,7 @@ class ChatOut(BaseModel):
     title: str
     username: Optional[str] = None
     type: Literal["user", "group", "channel", "bot"]
+    archived: bool = False
     unread: int = 0
     last_message: Optional[str] = None
     last_message_date: Optional[datetime] = None

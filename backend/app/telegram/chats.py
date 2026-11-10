@@ -27,11 +27,21 @@ def _title(entity: Any) -> str:
     return getattr(entity, "title", None) or str(getattr(entity, "id", ""))
 
 
-async def list_chats(account: dict, limit: int = 100) -> list[ChatOut]:
+async def list_chats(
+    account: dict,
+    limit: int = 100,
+    *,
+    archived_ids: set[int] | None = None,
+    archived: bool = False,
+) -> list[ChatOut]:
     client = await get_client(account["id"], account)
     dialogs = await with_floodwait(lambda: client.get_dialogs(limit=limit))
     out: list[ChatOut] = []
+    archived_ids = archived_ids or set()
     for d in dialogs:
+        is_archived = d.id in archived_ids
+        if is_archived != archived:
+            continue
         entity = d.entity
         last = d.message
         preview = None
@@ -46,6 +56,7 @@ async def list_chats(account: dict, limit: int = 100) -> list[ChatOut]:
                 title=_title(entity),
                 username=getattr(entity, "username", None),
                 type=_chat_type(entity),  # type: ignore[arg-type]
+                archived=is_archived,
                 unread=d.unread_count or 0,
                 last_message=preview,
                 last_message_date=last_date,

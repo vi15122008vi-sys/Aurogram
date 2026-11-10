@@ -24,6 +24,9 @@ export default {
         sans: ["Inter Tight", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
+      backdropBlur: {
+        glass: "16px",
+      },
     },
   },
   plugins: [],

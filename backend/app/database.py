@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS channel_settings (
     PRIMARY KEY (account_id, channel_id)
 );
 
+CREATE TABLE IF NOT EXISTS archived_chats (
+    account_id TEXT NOT NULL,
+    chat_id INTEGER NOT NULL,
+    archived_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (account_id, chat_id)
+);
+
 CREATE TABLE IF NOT EXISTS antispam_stopwords (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id TEXT NOT NULL,
