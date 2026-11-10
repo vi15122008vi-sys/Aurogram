@@ -1,0 +1,26 @@
+{% if not account_id %}
+  <div class="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">
+    {% if rows is defined and not rows and not account_id %}Выберите аккаунт, чтобы открыть его кэшированные чаты.{% endif %}
+  </div>
+{% elif rows %}
+  <div class="overflow-hidden rounded-xl border border-white/10 bg-zinc-900/30">
+    {% for row in rows %}
+    <a href="/admin/chat/{{ row.id }}?account_id={{ account_id|urlencode }}" class="group flex items-center gap-3 border-b border-white/5 p-3.5 last:border-b-0 hover:bg-white/[0.04]">
+      <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-indigo-400/20 bg-indigo-500/10 text-xs font-semibold text-indigo-200">{{ row.initial }}</span>
+      <span class="min-w-0 flex-1">
+        <span class="flex items-center gap-2">
+          <span class="truncate text-sm font-medium text-zinc-100 group-hover:text-white">{{ row.title }}</span>
+          {% if row.unread %}<span class="rounded-full bg-indigo-500/20 px-1.5 py-0.5 font-mono text-[10px] text-indigo-200">{{ row.unread }}</span>{% endif %}
+        </span>
+        <span class="mt-1 block truncate text-xs text-zinc-500">{{ row.type_label }}{% if row.last_message %} · {{ row.last_message }}{% endif %}</span>
+      </span>
+      <span class="shrink-0 text-right">
+        <span class="block text-[11px] text-zinc-500">{{ row.last_message_label }}</span>
+        <span class="mt-1 block font-mono text-[10px] text-zinc-700">{{ row.id }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">В кэше выбранного аккаунта пока нет чатов.</div>
+{% endif %}

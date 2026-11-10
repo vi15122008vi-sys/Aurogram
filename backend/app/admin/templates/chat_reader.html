@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block content %}
+<section class="mx-auto max-w-4xl">
+  <div class="sticky top-0 z-10 mb-4 flex items-center gap-3 border-b border-white/10 bg-zinc-950/95 py-3 backdrop-blur">
+    <a href="/admin/chats?account_id={{ account_id|urlencode }}" class="rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5">← Назад</a>
+    <div class="min-w-0 flex-1">
+      <h2 class="truncate text-base font-semibold">{{ chat.title }}</h2>
+      <p class="mt-0.5 text-xs text-zinc-500">{{ {'user': 'Личный чат', 'group': 'Группа', 'channel': 'Канал', 'bot': 'Бот'}.get(chat.type, 'Чат') }} · {{ account.name or account.phone }}</p>
+    </div>
+  </div>
+  <div id="message-list" class="space-y-2">
+    {% with messages=messages, has_more=has_more, next_offset=next_offset, account_id=account_id, chat_id=chat.id, chat_type=chat.type %}
+      {% include "message_page.html" %}
+    {% endwith %}
+    {% if not messages %}<p class="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">В кэше этого чата пока нет сообщений.</p>{% endif %}
+  </div>
+</section>
+{% endblock %}

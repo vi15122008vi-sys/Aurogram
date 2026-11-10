@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -115,22 +115,6 @@ async def _page_data(page: str) -> dict[str, Any]:
     if page == "bots":
         rows = await fetchall("SELECT id, account_id, username, name, webhook_url, created_at FROM bots ORDER BY created_at DESC")
         return {"rows": [dict(row) for row in rows]}
-    if page == "chats":
-        accounts = await fetchall("SELECT id, name FROM accounts ORDER BY created_at DESC")
-        rows: list[dict[str, Any]] = []
-        for account in accounts:
-            conn = await connect_cache(account["id"])
-            try:
-                cur = await conn.execute(
-                    "SELECT id, type, title, last_message_date, last_message_id FROM cached_chats ORDER BY last_message_date DESC LIMIT 100"
-                )
-                rows.extend(
-                    {**dict(row), "account_name": account["name"]}
-                    for row in await cur.fetchall()
-                )
-            finally:
-                await conn.close()
-        return {"rows": rows}
     if page == "editor":
         return {"rows": await _cached_messages(200)}
     if page == "stopwords":
@@ -208,6 +192,191 @@ async def _page_data(page: str) -> dict[str, Any]:
             }
         }
     return {}
+
+
+def _admin_time(value: Any) -> str:
+    if not value:
+        return "—"
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo:
+            parsed = parsed.astimezone()
+        return parsed.strftime("%d.%m.%Y %H:%M")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _chat_initial(title: str) -> str:
+    words = [word for word in title.split() if word]
+    if not words:
+        return "?"
+    return "".join(word[0] for word in words[:2]).upper()
+
+
+async def _admin_chat_rows(account_id: str) -> list[dict[str, Any]]:
+    conn = await connect_cache(account_id)
+    try:
+        cur = await conn.execute(
+            """SELECT c.id, c.type, c.title, c.username, c.unread,
+                      c.last_message_date, c.last_message_id,
+                      (SELECT m.text FROM cached_messages m
+                       WHERE m.chat_id = c.id AND m.id = c.last_message_id LIMIT 1) AS last_message
+               FROM cached_chats c
+               ORDER BY c.last_message_date DESC, c.id DESC LIMIT 300"""
+        )
+        rows = [dict(row) for row in await cur.fetchall()]
+    finally:
+        await conn.close()
+    type_labels = {"user": "Личный чат", "group": "Группа", "channel": "Канал", "bot": "Бот"}
+    for row in rows:
+        row["title"] = row.get("title") or str(row["id"])
+        row["initial"] = _chat_initial(row["title"])
+        row["type_label"] = type_labels.get(row.get("type"), "Чат")
+        row["last_message_label"] = _admin_time(row.get("last_message_date"))
+    return rows
+
+
+async def _admin_account(account_id: str) -> dict[str, Any] | None:
+    rows = await fetchall(
+        "SELECT id, name, phone FROM accounts WHERE id = ? LIMIT 1",
+        (account_id,),
+    )
+    return dict(rows[0]) if rows else None
+
+
+async def _admin_message_page(account_id: str, chat_id: int, offset: int) -> tuple[list[dict[str, Any]], bool]:
+    page_size = 50
+    conn = await connect_cache(account_id)
+    try:
+        cur = await conn.execute(
+            """SELECT m.id, m.sender_id, m.text, m.date, m.out, m.edited, m.deleted, m.media_type,
+                      cm.name AS sender_name
+               FROM cached_messages m
+               LEFT JOIN cached_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.sender_id
+               WHERE m.chat_id = ?
+               ORDER BY COALESCE(m.date, '') ASC, m.id ASC
+               LIMIT ? OFFSET ?""",
+            (chat_id, page_size + 1, offset),
+        )
+        rows = [dict(row) for row in await cur.fetchall()]
+    finally:
+        await conn.close()
+
+    has_more = len(rows) > page_size
+    rows = rows[:page_size]
+    media_labels = {
+        "MessageMediaPhoto": "📷 Фото",
+        "MessageMediaDocument": "📎 Файл или медиа",
+        "MessageMediaGeo": "📍 Геопозиция",
+        "MessageMediaWebPage": "🔗 Ссылка",
+        "MessageMediaContact": "👤 Контакт",
+        "MessageMediaPoll": "📊 Опрос",
+    }
+    for row in rows:
+        row["time_label"] = _admin_time(row.get("date"))
+        row["media_label"] = media_labels.get(row.get("media_type"), "📎 Медиа") if row.get("media_type") else None
+        if row.get("deleted"):
+            row["text"] = "Сообщение удалено"
+        elif not row.get("text") and row.get("media_type"):
+            row["text"] = "Медиа-сообщение"
+        elif not row.get("text"):
+            row["text"] = ""
+        row["out"] = bool(row.get("out"))
+    return rows, has_more
+
+
+@router.get("/chats", response_class=HTMLResponse)
+async def admin_chats(request: Request, account_id: str | None = None) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    accounts = [dict(row) for row in await fetchall(
+        "SELECT id, name, phone FROM accounts ORDER BY created_at DESC"
+    )]
+    valid_ids = {account["id"] for account in accounts}
+    selected_account_id = account_id if account_id in valid_ids else ""
+    rows = await _admin_chat_rows(selected_account_id) if selected_account_id else []
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="chat_list.html",
+            context={"request": request, "rows": rows, "account_id": selected_account_id},
+        )
+    return _page_response(request, "chats", {
+        "accounts": accounts,
+        "selected_account_id": selected_account_id,
+        "rows": rows,
+    })
+
+
+@router.get("/chat/{chat_id}", response_class=HTMLResponse)
+async def admin_chat(
+    request: Request,
+    chat_id: int,
+    account_id: str = "",
+) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    account = await _admin_account(account_id) if account_id else None
+    if not account:
+        return RedirectResponse("/admin/chats", status_code=303)
+    conn = await connect_cache(account_id)
+    try:
+        cur = await conn.execute(
+            "SELECT id, type, title, username FROM cached_chats WHERE id = ? LIMIT 1",
+            (chat_id,),
+        )
+        chat_row = await cur.fetchone()
+    finally:
+        await conn.close()
+    if not chat_row:
+        return HTMLResponse("Чат не найден в кэше", status_code=404)
+    chat = dict(chat_row)
+    chat["title"] = chat.get("title") or str(chat_id)
+    messages, has_more = await _admin_message_page(account_id, chat_id, 0)
+    return _page_response(request, "chat_reader", {
+        "account": account,
+        "account_id": account_id,
+        "chat": chat,
+        "messages": messages,
+        "has_more": has_more,
+        "next_offset": len(messages),
+    })
+
+
+@router.get("/chat/{chat_id}/messages", response_class=HTMLResponse)
+async def admin_chat_messages(
+    request: Request,
+    chat_id: int,
+    account_id: str,
+    offset: int = Query(default=50, ge=0, le=1_000_000),
+) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    account = await _admin_account(account_id)
+    if not account:
+        return HTMLResponse("Аккаунт не найден", status_code=404)
+    conn = await connect_cache(account_id)
+    try:
+        cur = await conn.execute("SELECT type FROM cached_chats WHERE id = ? LIMIT 1", (chat_id,))
+        chat_row = await cur.fetchone()
+    finally:
+        await conn.close()
+    if not chat_row:
+        return HTMLResponse("Чат не найден в кэше", status_code=404)
+    rows, has_more = await _admin_message_page(account_id, chat_id, offset)
+    return templates.TemplateResponse(
+        request=request,
+        name="message_page.html",
+        context={
+            "request": request,
+            "messages": rows,
+            "has_more": has_more,
+            "next_offset": offset + len(rows),
+            "account_id": account_id,
+            "chat_id": chat_id,
+            "chat_type": chat_row["type"],
+        },
+    )
 
 
 @router.get("", response_class=HTMLResponse)

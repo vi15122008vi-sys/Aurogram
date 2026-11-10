@@ -1,3 +1,19 @@
 {% extends "base.html" %}{% block content %}
-<div class="overflow-x-auto rounded-xl border border-white/10"><table class="w-full text-left text-sm"><thead class="bg-white/5 text-xs text-zinc-500"><tr><th class="p-3">Чат</th><th class="p-3">Тип</th><th class="p-3">Аккаунт</th><th class="p-3">Последнее сообщение</th><th class="p-3">Message ID</th></tr></thead><tbody>{% for row in rows %}<tr class="border-t border-white/5"><td class="p-3">{{ row.title or '—' }}</td><td class="p-3">{{ row.type }}</td><td class="p-3">{{ row.account_name or '—' }}</td><td class="p-3 text-zinc-500">{{ row.last_message_date or '—' }}</td><td class="p-3 font-mono text-zinc-500">{{ row.last_message_id or '—' }}</td></tr>{% else %}<tr><td colspan="5" class="p-4 text-zinc-500">Кэшированных чатов нет</td></tr>{% endfor %}</tbody></table></div>
+<section class="space-y-5">
+  <div class="max-w-xl rounded-xl border border-white/10 bg-zinc-900/50 p-4">
+    <label for="account-picker" class="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500">Аккаунт Telegram</label>
+    <select id="account-picker" name="account_id"
+            hx-get="/admin/chats" hx-trigger="change" hx-target="#chat-results"
+            hx-include="this" hx-push-url="true"
+            class="w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-indigo-400">
+      <option value="">Выберите аккаунт</option>
+      {% for account in accounts %}
+      <option value="{{ account.id }}" {{ 'selected' if account.id == selected_account_id else '' }}>{{ account.name or account.phone }} · {{ account.phone }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div id="chat-results">
+    {% include "chat_list.html" %}
+  </div>
+</section>
 {% endblock %}

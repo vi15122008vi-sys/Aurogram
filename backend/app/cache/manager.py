@@ -13,6 +13,20 @@ from app.config import get_settings
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
+def _chat_metadata(entity: Any, chat_id: int) -> tuple[str, str, Optional[str]]:
+    if entity is None:
+        return "user", str(chat_id), None
+    entity_type = type(entity).__name__
+    username = getattr(entity, "username", None)
+    if entity_type == "User":
+        title = " ".join(
+            part for part in (getattr(entity, "first_name", None), getattr(entity, "last_name", None)) if part
+        ) or username or str(chat_id)
+        return ("bot" if getattr(entity, "bot", False) else "user"), title, username
+    title = getattr(entity, "title", None) or str(chat_id)
+    return ("channel" if getattr(entity, "broadcast", False) else "group"), title, username
+
+
 def account_root(account_id: str) -> Path:
     settings = get_settings()
     root = Path(settings.cache_dir) / account_id
@@ -71,6 +85,44 @@ async def connect_cache(account_id: str) -> aiosqlite.Connection:
     return conn
 
 
+async def upsert_chat(
+    account_id: str,
+    chat_id: int,
+    entity: Any,
+    last_message: Any = None,
+    unread: int = 0,
+) -> None:
+    chat_type, title, username = _chat_metadata(entity, chat_id)
+    last_date = getattr(last_message, "date", None)
+    if last_date and getattr(last_date, "tzinfo", None) is None:
+        last_date = last_date.replace(tzinfo=timezone.utc)
+    conn = await connect_cache(account_id)
+    try:
+        await conn.execute(
+            """INSERT INTO cached_chats (id, type, title, username, last_message_date, last_message_id, unread)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET
+                 type=excluded.type,
+                 title=excluded.title,
+                 username=COALESCE(excluded.username, cached_chats.username),
+                 last_message_date=COALESCE(excluded.last_message_date, cached_chats.last_message_date),
+                 last_message_id=COALESCE(excluded.last_message_id, cached_chats.last_message_id),
+                 unread=excluded.unread""",
+            (
+                chat_id,
+                chat_type,
+                title,
+                username,
+                last_date.isoformat() if last_date else None,
+                getattr(last_message, "id", None),
+                max(0, int(unread or 0)),
+            ),
+        )
+        await conn.commit()
+    finally:
+        await conn.close()
+
+
 def _expires(days: int) -> Optional[str]:
     if days <= 0:
         return None
@@ -120,17 +172,40 @@ async def upsert_message(account_id: str, chat_id: int, msg: Any) -> None:
                 _expires(settings.cache_ttl_days),
             ),
         )
-        title = str(chat_id)
-        ctype = "user"
+        sender_id = getattr(msg, "sender_id", None)
+        try:
+            sender = getattr(msg, "sender", None)
+        except Exception:
+            sender = None
+        if sender_id is not None and sender is not None:
+            sender_name = " ".join(
+                part for part in (getattr(sender, "first_name", None), getattr(sender, "last_name", None)) if part
+            ) or getattr(sender, "title", None) or getattr(sender, "username", None)
+            if sender_name:
+                await conn.execute(
+                    """INSERT INTO cached_members (chat_id, user_id, name, username)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                         name=excluded.name, username=COALESCE(excluded.username, cached_members.username)""",
+                    (chat_id, sender_id, sender_name, getattr(sender, "username", None)),
+                )
+        try:
+            entity = getattr(msg, "chat", None)
+        except Exception:
+            entity = None
+        ctype, title, username = _chat_metadata(entity, chat_id)
         await conn.execute(
             """
-            INSERT INTO cached_chats (id, type, title, last_message_date, last_message_id)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO cached_chats (id, type, title, username, last_message_date, last_message_id)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
+              type=CASE WHEN excluded.title != CAST(excluded.id AS TEXT) THEN excluded.type ELSE cached_chats.type END,
+              title=CASE WHEN excluded.title != CAST(excluded.id AS TEXT) THEN excluded.title ELSE cached_chats.title END,
+              username=COALESCE(excluded.username, cached_chats.username),
               last_message_date=excluded.last_message_date,
               last_message_id=excluded.last_message_id
             """,
-            (chat_id, ctype, title, date_s, msg.id),
+            (chat_id, ctype, title, username, date_s, msg.id),
         )
         await conn.execute(
             """

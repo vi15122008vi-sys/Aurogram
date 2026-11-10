@@ -53,7 +53,7 @@ async def _write_heartbeat(accounts_active: int) -> None:
 
 async def _catch_up(account: dict, client: Any) -> None:
     """Doge offset_date for active chats with backoff."""
-    from app.cache.manager import get_chat_offsets, upsert_message
+    from app.cache.manager import get_chat_offsets, upsert_chat, upsert_message
 
     offsets = await get_chat_offsets(account["id"])
     dialogs = await client.get_dialogs(limit=50)
@@ -61,6 +61,7 @@ async def _catch_up(account: dict, client: Any) -> None:
         chat_id = d.id
         offset_date = offsets.get(chat_id)
         try:
+            await upsert_chat(account["id"], chat_id, d.entity, d.message, d.unread_count)
             messages = await client.get_messages(chat_id, limit=40, offset_date=offset_date)
             for m in reversed(list(messages) or []):
                 await upsert_message(account["id"], chat_id, m)
