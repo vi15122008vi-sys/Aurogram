@@ -4,6 +4,7 @@ import { Bell, Database, EyeOff, LogOut, ShieldCheck, UserRound } from "lucide-r
 import { ThemePicker } from "../components/ThemePicker";
 import { Toggle } from "../components/Toggle";
 import { applyTheme, themeList, type ThemeId } from "../lib/themes";
+import { useI18n } from "../lib/i18n";
 
 interface SettingsProps {
   accountName: string;
@@ -12,6 +13,7 @@ interface SettingsProps {
 }
 
 export function Settings({ accountName, phone, onLogout }: SettingsProps) {
+  const { locale, setLocale, t } = useI18n();
   const [ghostMode, setGhostMode] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [quietHours, setQuietHours] = useState(false);
@@ -35,57 +37,68 @@ export function Settings({ accountName, phone, onLogout }: SettingsProps) {
 
   return (
     <section className="animate-[rise-in_240ms_ease-out]">
-      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">PREFERENCES</p>
-      <h1 className="mt-2 text-[28px] font-semibold text-ink">Настройки</h1>
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("PREFERENCES")}</p>
+      <h1 className="mt-2 text-[28px] font-semibold text-ink">{t("Настройки")}</h1>
       <div className="mt-5 grid max-w-3xl gap-5">
         <section>
-          <SectionHeading>АККАУНТ</SectionHeading>
+          <SectionHeading>{t("АККАУНТ")}</SectionHeading>
           <div className="flex items-center gap-3 rounded-xl border border-border bg-surface/90 p-3.5 transition hover:border-accent/20">
             <span className="grid size-10 place-items-center rounded-lg bg-raised text-muted"><UserRound size={17} /></span>
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{accountName}</span><span className="mt-1 block truncate font-mono text-xs text-muted">{phone}</span></span>
-            <span className="rounded-lg bg-success/10 px-2 py-1 font-mono text-[10px] uppercase text-success">Активен</span>
+            <span className="rounded-lg bg-success/10 px-2 py-1 font-mono text-[10px] uppercase text-success">{t("Активен")}</span>
           </div>
         </section>
 
         <section>
-          <SectionHeading>GHOST</SectionHeading>
+          <SectionHeading>{t("GHOST")}</SectionHeading>
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface/90">
-            <SettingRow icon={<EyeOff size={16} />} title="Ghost-режим" description="Не отправлять отметку о прочтении" control={<Toggle label="Ghost-режим" checked={ghostMode} onChange={setGhostMode} />} />
+            <SettingRow icon={<EyeOff size={16} />} title={t("Ghost-режим")} description={t("Не отправлять отметку о прочтении")} control={<Toggle label={t("Ghost-режим")} checked={ghostMode} onChange={setGhostMode} />} />
           </div>
         </section>
 
         <section>
-          <SectionHeading>УВЕДОМЛЕНИЯ</SectionHeading>
+          <SectionHeading>{t("УВЕДОМЛЕНИЯ")}</SectionHeading>
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface/90">
-            <SettingRow icon={<Bell size={16} />} title="Push-уведомления" description="Новые сообщения и события" control={<Toggle label="Push-уведомления" checked={pushEnabled} onChange={setPushEnabled} />} />
-            <SettingRow icon={<Bell size={16} />} title="Тихий режим" description="Приостановить уведомления" control={<Toggle label="Тихий режим" checked={quietHours} onChange={setQuietHours} />} />
+            <SettingRow icon={<Bell size={16} />} title={t("Push-уведомления")} description={t("Новые сообщения и события")} control={<Toggle label={t("Push-уведомления")} checked={pushEnabled} onChange={setPushEnabled} />} />
+            <SettingRow icon={<Bell size={16} />} title={t("Тихий режим")} description={t("Приостановить уведомления")} control={<Toggle label={t("Тихий режим")} checked={quietHours} onChange={setQuietHours} />} />
           </div>
         </section>
 
         <section>
-          <div className="mb-2 flex items-center justify-between"><SectionHeading>КЭШ</SectionHeading><span className="font-mono text-xs tabular-nums text-muted">{cacheLimit} GB</span></div>
+          <div className="mb-2 flex items-center justify-between"><SectionHeading>{t("КЭШ")}</SectionHeading><span className="font-mono text-xs tabular-nums text-muted">{cacheLimit} GB</span></div>
           <div className="rounded-xl border border-border bg-surface/90 p-3.5">
-            <label htmlFor="cache-limit" className="text-xs text-muted">Максимальный размер</label>
+            <label htmlFor="cache-limit" className="text-xs text-muted">{t("Максимальный размер")}</label>
               <input id="cache-limit" type="range" min={1} max={100} step={1} value={cacheLimit} onChange={(event) => { setCacheLimit(Number(event.target.value)); setCacheReset(false); }} className="mt-3 block h-5 w-full accent-accent" />
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted"><Database size={14} />Лимит хранения медиа и сообщений</div>
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted"><Database size={14} />{t("Лимит хранения медиа и сообщений")}</div>
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span role="status" className="text-xs text-muted">{cacheReset ? "Значение по умолчанию" : "Лимит кэша"}</span>
-              <button type="button" onClick={() => { setCacheLimit(20); setCacheReset(true); }} className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-xs font-medium text-muted hover:bg-raised"><Database size={14} />Сбросить лимит</button>
+              <span role="status" className="text-xs text-muted">{cacheReset ? t("Значение по умолчанию") : t("Лимит кэша")}</span>
+              <button type="button" onClick={() => { setCacheLimit(20); setCacheReset(true); }} className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-xs font-medium text-muted hover:bg-raised"><Database size={14} />{t("Сбросить лимит")}</button>
             </div>
           </div>
         </section>
 
         <section>
-          <SectionHeading>БЕЗОПАСНОСТЬ</SectionHeading>
+          <SectionHeading>{t("БЕЗОПАСНОСТЬ")}</SectionHeading>
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface/90">
-            <SettingRow icon={<ShieldCheck size={16} />} title="Сессия аккаунта" description="Авторизация хранится в HttpOnly cookie" control={<span className="font-mono text-[10px] text-success">ЗАЩИЩЕНА</span>} />
-            <div className="flex justify-end p-3"><button type="button" onClick={onLogout} className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-xs font-medium text-ink hover:bg-raised"><LogOut size={14} />Выйти из аккаунта</button></div>
+            <SettingRow icon={<ShieldCheck size={16} />} title={t("Сессия аккаунта")} description={t("Авторизация хранится в HttpOnly cookie")} control={<span className="font-mono text-[10px] text-success">{t("ЗАЩИЩЕНА")}</span>} />
+            <div className="flex justify-end p-3"><button type="button" onClick={onLogout} className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-xs font-medium text-ink hover:bg-raised"><LogOut size={14} />{t("Выйти из аккаунта")}</button></div>
           </div>
         </section>
 
         <section>
-          <SectionHeading>ТЕМА</SectionHeading>
+          <SectionHeading>{t("ТЕМА")}</SectionHeading>
           <div className="rounded-xl border border-border bg-surface/90 p-3.5"><ThemePicker selectedId={theme} onSelect={changeTheme} /></div>
+        </section>
+        <section>
+          <SectionHeading>{t("ЯЗЫК")}</SectionHeading>
+          <div className="rounded-xl border border-border bg-surface/90 p-3.5">
+            <label htmlFor="interface-language" className="mb-2 block text-xs text-muted">{t("Язык интерфейса")}</label>
+            <select id="interface-language" value={locale} onChange={(event) => setLocale(event.target.value as "ru" | "en")} className="h-10 w-full rounded-lg border border-line bg-raised px-3 text-sm text-ink outline-none focus:border-accent">
+              <option value="ru">{t("Русский")}</option>
+              <option value="en">{t("Английский")}</option>
+            </select>
+            <p className="mt-2 text-xs text-muted">{t("Сохранено на этом устройстве")}</p>
+          </div>
         </section>
       </div>
     </section>

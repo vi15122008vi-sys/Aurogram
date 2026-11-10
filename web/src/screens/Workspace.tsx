@@ -6,6 +6,7 @@ import { Channels } from "./Channels";
 import { ChannelDetail } from "./ChannelDetail";
 import { MessageList } from "./MessageList";
 import { Settings } from "./Settings";
+import { useI18n } from "../lib/i18n";
 
 interface WorkspaceProps {
   tab: AppTab;
@@ -33,6 +34,7 @@ function itemMeta(item: Row, tab: AppTab): string {
 }
 
 export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
+  const { t } = useI18n();
   const [rows, setRows] = useState<Row[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<{ id: number; title: string; username: string | null; subscribers: number; posts_count: number } | null>(null);
   const [selectedChannelTab, setSelectedChannelTab] = useState<"posts" | "stats">("posts");
@@ -58,7 +60,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
         if (active) setRows(items);
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : "Не удалось загрузить данные");
+        if (active) setError(t(cause instanceof Error ? cause.message : "Не удалось загрузить данные"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -85,8 +87,8 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   if (tab === "chats" && selectedChat) {
     return (
       <section className="animate-[rise-in_240ms_ease-out]">
-        <button type="button" onClick={() => setSelectedChat(null)} className="mb-4 inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface hover:text-ink"><ArrowLeft size={15} />Чаты</button>
-        <div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">INBOX / {selectedChat.type}</p><h1 className="mt-1 text-[25px] font-semibold">{selectedChat.title}</h1></div>
+        <button type="button" onClick={() => setSelectedChat(null)} className="mb-4 inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface hover:text-ink"><ArrowLeft size={15} />{t("Чаты")}</button>
+        <div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("INBOX")} / {t(selectedChat.type)}</p><h1 className="mt-1 text-[25px] font-semibold">{selectedChat.title}</h1></div>
         <MessageList chatId={selectedChat.id} allowSend />
       </section>
     );
@@ -98,16 +100,16 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     <section className="animate-[rise-in_240ms_ease-out]">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{content.kicker}</p>
-          <h1 className="mt-2 text-[28px] font-semibold">{content.title}</h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t(content.kicker)}</p>
+          <h1 className="mt-2 text-[28px] font-semibold">{t(content.title)}</h1>
         </div>
         <button
           type="button"
           className="grid size-9 place-items-center rounded-lg border border-line bg-surface text-muted transition hover:bg-raised hover:text-ink disabled:opacity-50"
           onClick={() => setReloadKey((key) => key + 1)}
           disabled={loading}
-          aria-label="Обновить список"
-          title="Обновить"
+          aria-label={t("Обновить список")}
+          title={t("Обновить")}
         >
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
@@ -120,7 +122,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
               <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-raised text-muted"><Icon size={18} strokeWidth={1.7} /></span>
               <span className="min-w-0 flex-1 text-left">
                 <span className="block truncate text-sm font-semibold">{itemTitle(item)}</span>
-                <span className="mt-1 block truncate text-xs text-muted">{"last_message" in item && item.last_message ? item.last_message : itemMeta(item, tab)}</span>
+                <span className="mt-1 block truncate text-xs text-muted">{"last_message" in item && item.last_message ? item.last_message : t(itemMeta(item, tab))}</span>
               </span>
               {"unread" in item && item.unread > 0 && <span className="rounded-lg bg-accent/10 px-2 py-1 font-mono text-xs text-accent">{item.unread}</span>}
             </>;
@@ -133,8 +135,8 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
         <div className="mt-6 grid min-h-[280px] place-items-center rounded-xl border border-dashed border-line bg-surface/60 px-4 py-6 text-center">
           <div className="max-w-xs">
             <span className="mx-auto grid size-12 place-items-center rounded-xl bg-raised text-muted"><Icon size={21} strokeWidth={1.5} /></span>
-            <h2 className="mt-4 text-base font-semibold">{loading ? "Загружаем…" : content.empty}</h2>
-            {!loading && <p className="mt-2 text-sm leading-6 text-muted">{content.hint}</p>}
+            <h2 className="mt-4 text-base font-semibold">{loading ? t("Загружаем…") : t(content.empty)}</h2>
+            {!loading && <p className="mt-2 text-sm leading-6 text-muted">{t(content.hint)}</p>}
           </div>
         </div>
       )}

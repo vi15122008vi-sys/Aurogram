@@ -1,4 +1,5 @@
 import { Bot, MessageCircle, Radio, Settings } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
 export type AppTab = "channels" | "bots" | "chats" | "settings";
 
@@ -15,8 +16,9 @@ const items = [
 ] as const;
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
+  const { t } = useI18n();
   return (
-    <nav aria-label="Основная навигация" className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface/75 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_36px_rgb(0_0_0_/_12%)] backdrop-blur-2xl supports-[backdrop-filter]:bg-surface/60">
+    <nav aria-label={t("Основная навигация")} className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface/75 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_36px_rgb(0_0_0_/_12%)] backdrop-blur-2xl supports-[backdrop-filter]:bg-surface/60">
       <div className="mx-auto grid h-14 max-w-2xl grid-cols-4">
         {items.map(({ id, label, icon: Icon }) => {
           const selected = active === id;
@@ -25,12 +27,12 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
               key={id}
               type="button"
               aria-current={selected ? "page" : undefined}
-              aria-label={label}
+              aria-label={t(label)}
               onClick={() => onChange(id)}
               className={`relative mx-1 my-1 flex h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-medium transition duration-200 ${selected ? "bg-accent/10 text-accent" : "text-muted hover:bg-surfaceRaised/70 hover:text-ink"}`}
             >
               <Icon size={18} strokeWidth={1.5} />
-              <span>{label}</span>
+              <span>{t(label)}</span>
               {selected && <span className="absolute inset-x-5 -top-1 h-px rounded-full bg-accent shadow-[0_0_8px_var(--accent)]" aria-hidden="true" />}
             </button>
           );

@@ -1,3 +1,5 @@
+import { translateApiMessage } from "./i18n";
+
 export interface AuthAccount {
   id: string;
   name: string;
@@ -162,10 +164,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   } catch {
     throw new ApiError("Не удалось связаться с сервером. Проверьте подключение и настройки API.", 0);
   }
-  const body = response.status === 204 ? undefined : await response.json().catch(() => undefined);
+  let body: any;
+  if (response.status !== 204) {
+    try {
+      body = await response.json();
+    } catch {
+      if (response.ok) {
+        throw new ApiError(translateApiMessage("Сервер вернул некорректный ответ. Попробуйте позже."), response.status);
+      }
+    }
+  }
 
   if (!response.ok) {
-    throw new ApiError(readableApiError(body?.detail, response.status), response.status);
+    throw new ApiError(translateApiMessage(readableApiError(body?.detail, response.status)), response.status);
   }
   return body as T;
 }
@@ -187,12 +198,21 @@ function readableApiError(detail: unknown, status: number): string {
 async function download(path: string): Promise<Blob> {
   const headers = new Headers();
   if (bearerToken) headers.set("Authorization", `Bearer ${bearerToken}`);
-  const response = await fetch(`${apiBase}${path}`, { credentials: "include", headers });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}${path}`, { credentials: "include", headers });
+  } catch {
+    throw new ApiError(translateApiMessage("Не удалось связаться с сервером. Проверьте подключение и настройки API."), 0);
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => undefined);
-    throw new ApiError(readableApiError(body?.detail, response.status), response.status);
+    throw new ApiError(translateApiMessage(readableApiError(body?.detail, response.status)), response.status);
   }
-  return response.blob();
+  try {
+    return await response.blob();
+  } catch {
+    throw new ApiError(translateApiMessage("Не удалось загрузить файл. Попробуйте ещё раз."), 0);
+  }
 }
 
 const json = (value: unknown): string => JSON.stringify(value);
@@ -278,3 +298,4 @@ export const api = {
       download(`/messages/${chatId}/${messageId}/media`),
   },
 };
+

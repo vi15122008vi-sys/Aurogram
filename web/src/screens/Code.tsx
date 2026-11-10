@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, MessageSquareText } from "lucide-react";
 import { AuthShell } from "../components/AuthShell";
+import { useI18n } from "../lib/i18n";
 
 interface CodeProps {
   phone: string;
@@ -11,6 +12,7 @@ interface CodeProps {
 }
 
 export function Code({ phone, busy, error, onSubmit, onBack }: CodeProps) {
+  const { t } = useI18n();
   const [code, setCode] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -21,12 +23,12 @@ export function Code({ phone, busy, error, onSubmit, onBack }: CodeProps) {
   return (
     <AuthShell
       eyebrow="ACCOUNT / 02"
-      title="Введите код"
-      description={`Код подтверждения отправлен для номера ${phone}.`}
+      title={t("Введите код")}
+      description={t("Код подтверждения отправлен для номера") + " " + phone + "."}
     >
       <form className="space-y-5" onSubmit={submit}>
         <label className="block text-sm font-medium" htmlFor="login-code">
-          Код подтверждения
+          {t("Код подтверждения")}
           <span className="mt-2 flex h-12 items-center rounded-lg border border-line bg-surface px-3 transition focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent/50">
             <MessageSquareText size={17} className="shrink-0 text-muted" />
             <input
@@ -45,11 +47,11 @@ export function Code({ phone, busy, error, onSubmit, onBack }: CodeProps) {
         </label>
         {error && <p role="alert" className="rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         <button className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-60" disabled={busy || code.length < 4}>
-          {busy ? "Проверяем…" : "Подтвердить"}
+          {busy ? t("Проверяем…") : t("Подтвердить")}
           {!busy && <ArrowRight size={16} />}
         </button>
         <button type="button" onClick={onBack} className="mx-auto flex items-center gap-2 py-1 text-sm text-muted hover:text-ink">
-          <ArrowLeft size={15} /> Изменить номер
+          <ArrowLeft size={15} /> {t("Изменить номер")}
         </button>
       </form>
     </AuthShell>

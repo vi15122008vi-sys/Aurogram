@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, KeyRound, Phone } from "lucide-react";
 import { AuthShell } from "../components/AuthShell";
+import { useI18n } from "../lib/i18n";
 
 interface PhoneInputProps {
   busy: boolean;
@@ -19,6 +20,7 @@ const prefixes = [
 ];
 
 export function PhoneInput({ busy, error, onSubmit, onApiKey }: PhoneInputProps) {
+  const { t } = useI18n();
   const [prefix, setPrefix] = useState("+7");
   const [number, setNumber] = useState("");
 
@@ -32,15 +34,15 @@ export function PhoneInput({ busy, error, onSubmit, onApiKey }: PhoneInputProps)
   return (
     <AuthShell
       eyebrow="ACCOUNT / 01"
-      title="Подключить аккаунт"
-      description="Укажите номер телефона, чтобы получить код подтверждения."
+      title={t("Подключить аккаунт")}
+      description={t("Укажите номер телефона, чтобы получить код подтверждения.")}
     >
       <form className="space-y-5" onSubmit={submit}>
         <label className="block text-sm font-medium" htmlFor="phone-number">
-          Номер телефона
+          {t("Номер телефона")}
           <span className="mt-2 flex h-12 overflow-hidden rounded-lg border border-line bg-surface transition focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent/50">
             <select
-              aria-label="Код страны"
+              aria-label={t("Код страны")}
               className="w-[92px] border-r border-line bg-raised px-3 text-sm outline-none"
               value={prefix}
               onChange={(event) => setPrefix(event.target.value)}
@@ -71,13 +73,13 @@ export function PhoneInput({ busy, error, onSubmit, onApiKey }: PhoneInputProps)
           type="submit"
           disabled={busy || number.replace(/\D/g, "").length < 7}
         >
-          {busy ? "Отправляем код…" : "Продолжить"}
+          {busy ? t("Отправляем код…") : t("Продолжить")}
           {!busy && <ArrowRight size={16} />}
         </button>
       </form>
       <div className="my-5 flex items-center gap-3 text-[10px] font-mono uppercase text-muted">
         <span className="h-px flex-1 bg-line" />
-        дополнительная настройка
+        {t("дополнительная настройка")}
         <span className="h-px flex-1 bg-line" />
       </div>
       <button
@@ -86,7 +88,7 @@ export function PhoneInput({ busy, error, onSubmit, onApiKey }: PhoneInputProps)
         className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-line bg-surface text-sm font-medium text-ink transition hover:bg-raised"
       >
         <KeyRound size={15} className="text-muted" />
-        Настроить API ID и Hash
+        {t("Настроить API ID и Hash")}
       </button>
     </AuthShell>
   );

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, KeyRound } from "lucide-react";
 import { AuthShell } from "../components/AuthShell";
+import { useI18n } from "../lib/i18n";
 
 interface ApiKeyProps {
   busy: boolean;
@@ -10,6 +11,7 @@ interface ApiKeyProps {
 }
 
 export function ApiKey({ busy, error, onSubmit, onBack }: ApiKeyProps) {
+  const { t } = useI18n();
   const [apiId, setApiId] = useState("");
   const [apiHash, setApiHash] = useState("");
 
@@ -24,8 +26,8 @@ export function ApiKey({ busy, error, onSubmit, onBack }: ApiKeyProps) {
   return (
     <AuthShell
       eyebrow="CONNECTION / API"
-      title="API credentials"
-      description="Введите API ID и API Hash для подключения аккаунта."
+      title={t("API credentials")}
+      description={t("Введите API ID и API Hash для подключения аккаунта.")}
     >
       <form className="space-y-4" onSubmit={submit}>
         <label className="block text-sm font-medium" htmlFor="api-id">
@@ -55,15 +57,15 @@ export function ApiKey({ busy, error, onSubmit, onBack }: ApiKeyProps) {
         </label>
         {error && <p role="alert" className="rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         <button className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-60" disabled={busy || apiHash.length !== 32 || !apiId}>
-          {busy ? "Сохраняем…" : "Сохранить и продолжить"}
+          {busy ? t("Сохраняем…") : t("Сохранить и продолжить")}
           {!busy && <ArrowRight size={16} />}
         </button>
         <button type="button" onClick={onBack} className="mx-auto flex items-center gap-2 py-1 text-sm text-muted hover:text-ink">
-          <ArrowLeft size={15} /> Назад
+          <ArrowLeft size={15} /> {t("Назад")}
         </button>
         <div className="flex items-start gap-2 rounded-lg bg-raised p-3 text-xs leading-5 text-muted">
           <KeyRound size={14} className="mt-0.5 shrink-0" />
-          <span>Ключи не сохраняются в браузере после завершения настройки.</span>
+          <span>{t("Ключи не сохраняются в браузере после завершения настройки.")}</span>
         </div>
       </form>
     </AuthShell>

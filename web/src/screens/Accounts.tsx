@@ -1,4 +1,5 @@
 import { Check, Smartphone } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
 export interface AccountSummary {
   id: string;
@@ -14,10 +15,11 @@ interface AccountsProps {
 }
 
 export function Accounts({ accounts, onSelect }: AccountsProps) {
+  const { t } = useI18n();
   return (
     <section>
-      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">IDENTITIES</p>
-      <h1 className="mt-2 text-[28px] font-semibold text-ink">Аккаунты</h1>
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("IDENTITIES")}</p>
+      <h1 className="mt-2 text-[28px] font-semibold text-ink">{t("Аккаунты")}</h1>
       <div className="mt-6 grid gap-2">
         {accounts.map((account) => (
           <button key={account.id} type="button" onClick={() => onSelect?.(account)} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left hover:bg-raised">
@@ -26,7 +28,7 @@ export function Accounts({ accounts, onSelect }: AccountsProps) {
             {account.active && <Check size={17} className="text-accent" />}
           </button>
         ))}
-        {!accounts.length && <div className="rounded-xl border border-dashed border-line bg-surface p-3 text-center text-sm text-muted">Нет подключённых аккаунтов</div>}
+        {!accounts.length && <div className="rounded-xl border border-dashed border-line bg-surface p-3 text-center text-sm text-muted">{t("Нет подключённых аккаунтов")}</div>}
       </div>
     </section>
   );

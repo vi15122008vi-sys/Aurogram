@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, LockKeyhole } from "lucide-react";
 import { AuthShell } from "../components/AuthShell";
+import { useI18n } from "../lib/i18n";
 
 interface TwoFactorProps {
   busy: boolean;
@@ -10,6 +11,7 @@ interface TwoFactorProps {
 }
 
 export function TwoFactor({ busy, error, onSubmit, onBack }: TwoFactorProps) {
+  const { t } = useI18n();
   const [password, setPassword] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -20,12 +22,12 @@ export function TwoFactor({ busy, error, onSubmit, onBack }: TwoFactorProps) {
   return (
     <AuthShell
       eyebrow="ACCOUNT / 03"
-      title="Пароль двухэтапной проверки"
-      description="Для этого аккаунта включена дополнительная защита."
+      title={t("Пароль двухэтапной проверки")}
+      description={t("Для этого аккаунта включена дополнительная защита.")}
     >
       <form className="space-y-5" onSubmit={submit}>
         <label className="block text-sm font-medium" htmlFor="two-factor-password">
-          Пароль
+          {t("Пароль")}
           <span className="mt-2 flex h-12 items-center rounded-lg border border-line bg-surface px-3 transition focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent/50">
             <LockKeyhole size={17} className="shrink-0 text-muted" />
             <input
@@ -41,11 +43,11 @@ export function TwoFactor({ busy, error, onSubmit, onBack }: TwoFactorProps) {
         </label>
         {error && <p role="alert" className="rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         <button className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-60" disabled={busy || !password}>
-          {busy ? "Проверяем…" : "Войти"}
+          {busy ? t("Проверяем…") : t("Войти")}
           {!busy && <ArrowRight size={16} />}
         </button>
         <button type="button" onClick={onBack} className="mx-auto flex items-center gap-2 py-1 text-sm text-muted hover:text-ink">
-          <ArrowLeft size={15} /> Назад к коду
+          <ArrowLeft size={15} /> {t("Назад к коду")}
         </button>
       </form>
     </AuthShell>

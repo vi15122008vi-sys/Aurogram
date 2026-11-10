@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2 } from "lucide-react";
 import { api } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
 interface VoicePlayerProps {
   chatId: number;
@@ -15,6 +16,7 @@ function formatTime(seconds: number): string {
 }
 
 export function VoicePlayer({ chatId, messageId, durationHint, waveform }: VoicePlayerProps) {
+  const { t } = useI18n();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +68,7 @@ export function VoicePlayer({ chatId, messageId, durationHint, waveform }: Voice
 
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5">
-      <button type="button" onClick={togglePlayback} disabled={loading || error} aria-label={playing ? "Приостановить голосовое сообщение" : "Воспроизвести голосовое сообщение"} className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-white disabled:bg-raised">
+      <button type="button" onClick={togglePlayback} disabled={loading || error} aria-label={playing ? t("Приостановить голосовое сообщение") : t("Воспроизвести голосовое сообщение")} className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-white disabled:bg-raised">
         {loading ? <Volume2 size={16} /> : playing ? <Pause size={16} /> : <Play size={16} />}
       </button>
       <audio
@@ -79,13 +81,13 @@ export function VoicePlayer({ chatId, messageId, durationHint, waveform }: Voice
         className="hidden"
       />
       <div className="min-w-0 flex-1">
-        <div className="flex h-8 items-center gap-[3px]" aria-label="Форма волны">
+        <div className="flex h-8 items-center gap-[3px]" aria-label={t("Форма волны")}>
           {bars.map((height, index) => (
             <span key={index} className={`w-[3px] min-w-[2px] flex-1 ${index / bars.length <= progress ? "bg-accent" : "bg-muted/40"}`} style={{ height: `${Math.min(100, Math.max(12, height))}%` }} />
           ))}
         </div>
         <div className="mt-1 flex justify-between font-mono text-[9px] tabular-nums text-muted">
-          <span>{error ? "Медиа недоступно" : loading ? "Загрузка…" : formatTime(current)}</span>
+          <span>{error ? t("Медиа недоступно") : loading ? t("Загрузка…") : formatTime(current)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>

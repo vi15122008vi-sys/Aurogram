@@ -8,12 +8,14 @@ import { Code } from "./screens/Code";
 import { PhoneInput } from "./screens/PhoneInput";
 import { TwoFactor } from "./screens/TwoFactor";
 import { Workspace } from "./screens/Workspace";
-import { api, type AuthAccount, type SendCodeResult } from "./lib/api";
+import { ApiError, api, type AuthAccount, type SendCodeResult } from "./lib/api";
 import { applyTheme, themeList, type ThemeId } from "./lib/themes";
+import { useI18n } from "./lib/i18n";
 
 type AuthScreen = "phone" | "code" | "twoFactor" | "apiKey";
 
 export default function App() {
+  const { locale, t } = useI18n();
   const [account, setAccount] = useState<AuthAccount | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [authScreen, setAuthScreen] = useState<AuthScreen>("phone");
@@ -22,6 +24,10 @@ export default function App() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   useEffect(() => {
     const storedTheme = localStorage.getItem("aurogram.theme") as ThemeId | null;
@@ -36,8 +42,12 @@ export default function App() {
       .then((result) => {
         if (active) setAccount(result);
       })
-      .catch(() => {
-        if (active) setAccount(null);
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setAccount(null);
+        if (!(cause instanceof ApiError && cause.status === 401)) {
+          setError(cause instanceof Error ? t(cause.message) : t("Не удалось проверить сессию"));
+        }
       })
       .finally(() => {
         if (active) setCheckingSession(false);
@@ -55,7 +65,7 @@ export default function App() {
       setPending(result);
       setAuthScreen("code");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось отправить код");
+      setError(cause instanceof Error ? t(cause.message) : t("Не удалось отправить код"));
     } finally {
       setBusy(false);
     }
@@ -75,7 +85,7 @@ export default function App() {
         setAccount(signedIn);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось проверить код");
+      setError(cause instanceof Error ? t(cause.message) : t("Не удалось проверить код"));
     } finally {
       setBusy(false);
     }
@@ -95,7 +105,7 @@ export default function App() {
       if (result.need_password) throw new Error("Проверьте пароль и попробуйте ещё раз");
       setAccount(await api.auth.me());
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось войти");
+      setError(cause instanceof Error ? t(cause.message) : t("Не удалось войти"));
     } finally {
       setBusy(false);
     }
@@ -108,23 +118,25 @@ export default function App() {
       await api.auth.registerKey(apiId, apiHash);
       setAuthScreen("phone");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось сохранить API credentials");
+      setError(cause instanceof Error ? t(cause.message) : t("Не удалось сохранить API credentials"));
     } finally {
       setBusy(false);
     }
   }
 
   async function logout() {
+    setError(null);
     try {
       await api.auth.logout();
-    } finally {
-      setAccount(null);
-      setPending(null);
-      setCode("");
-      setAuthScreen("phone");
-      setActiveTab("channels");
-      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? t(cause.message) : t("Не удалось выйти из аккаунта"));
+      return;
     }
+    setAccount(null);
+    setPending(null);
+    setCode("");
+    setAuthScreen("phone");
+    setActiveTab("channels");
   }
 
   if (checkingSession) {
@@ -133,7 +145,7 @@ export default function App() {
 
   if (account) {
     return (
-      <Layout accountName={account.name || account.phone} activeTab={activeTab} onTabChange={setActiveTab} onLogout={logout}>
+      <Layout accountName={account.name || account.phone} activeTab={activeTab} onTabChange={setActiveTab} onLogout={logout} error={error}>
         <Workspace tab={activeTab} account={account} onLogout={logout} />
       </Layout>
     );

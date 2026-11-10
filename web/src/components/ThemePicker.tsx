@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { useState } from "react";
 import { applyTheme, themeList, type ThemeId } from "../lib/themes";
+import { useI18n } from "../lib/i18n";
 
 interface ThemePickerProps {
   selectedId?: ThemeId;
@@ -8,6 +9,7 @@ interface ThemePickerProps {
 }
 
 export function ThemePicker({ selectedId, onSelect }: ThemePickerProps) {
+  const { t } = useI18n();
   const [internalSelection, setInternalSelection] = useState<ThemeId>("aurogram");
   const selected = selectedId ?? internalSelection;
 
@@ -18,7 +20,7 @@ export function ThemePicker({ selectedId, onSelect }: ThemePickerProps) {
   }
 
   return (
-    <section aria-label="Выбор темы">
+    <section aria-label={t("Выбор темы")}>
       <div className="grid grid-cols-2 gap-3">
         {themeList.map((theme) => {
           const active = selected === theme.id;
@@ -40,7 +42,7 @@ export function ThemePicker({ selectedId, onSelect }: ThemePickerProps) {
                 </span>
               </span>
               <span className="flex min-h-10 items-center justify-between gap-2 bg-surface px-3 py-2">
-                <span className="truncate text-xs font-medium text-ink">{theme.name}</span>
+                <span className="truncate text-xs font-medium text-ink">{t(theme.name)}</span>
                 {active && <Check size={14} className="shrink-0 text-accent" />}
               </span>
             </button>

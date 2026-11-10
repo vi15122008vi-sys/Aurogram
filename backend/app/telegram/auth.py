@@ -7,6 +7,7 @@ from typing import Any, Optional
 from fastapi import HTTPException
 from telethon.errors import (
     FloodWaitError,
+    PhoneCodeExpiredError,
     PasswordHashInvalidError,
     PhoneCodeInvalidError,
     SessionPasswordNeededError,
@@ -307,6 +308,12 @@ async def send_code(
             f"Слишком много попыток. Подождите {e.seconds} секунд.",
             headers={"Retry-After": str(e.seconds)},
         )
+    except Exception as e:
+        from telethon.errors import RPCError
+
+        if isinstance(e, RPCError):
+            raise HTTPException(400, _auth_error_message(e)) from e
+        raise
     finally:
         await client.disconnect()
 
@@ -350,14 +357,28 @@ async def sign_in(
                     f"Слишком много попыток. Подождите {e.seconds} секунд.",
                     headers={"Retry-After": str(e.seconds)},
                 )
+            except Exception as e:
+                from telethon.errors import RPCError
+
+                if isinstance(e, RPCError):
+                    raise HTTPException(400, _auth_error_message(e)) from e
+                raise
         except PhoneCodeInvalidError:
             raise HTTPException(400, "Неверный код. Попробуйте ещё раз.")
+        except PhoneCodeExpiredError:
+            raise HTTPException(400, "Срок действия кода истёк. Запросите новый код.")
         except FloodWaitError as e:
             raise HTTPException(
                 429,
                 f"Слишком много попыток. Подождите {e.seconds} секунд.",
                 headers={"Retry-After": str(e.seconds)},
             )
+        except Exception as e:
+            from telethon.errors import RPCError
+
+            if isinstance(e, RPCError):
+                raise HTTPException(400, _auth_error_message(e)) from e
+            raise
 
         name = " ".join(filter(None, [getattr(me, "first_name", None), getattr(me, "last_name", None)])).strip()
         username = getattr(me, "username", None)
@@ -379,6 +400,25 @@ async def sign_in(
         }
     finally:
         pass
+
+
+def _auth_error_message(error: Exception) -> str:
+    """Translate common Telegram RPC auth errors into actionable Russian text."""
+    code = getattr(error, "message", "") or str(error)
+    normalized = code.upper()
+    if "PHONE_NUMBER_INVALID" in normalized:
+        return "Номер телефона указан неверно. Проверьте номер и попробуйте снова."
+    if "PHONE_NUMBER_BANNED" in normalized:
+        return "Этот номер телефона заблокирован Telegram."
+    if "PHONE_CODE_INVALID" in normalized:
+        return "Неверный код. Проверьте его и попробуйте ещё раз."
+    if "PHONE_CODE_EXPIRED" in normalized:
+        return "Срок действия кода истёк. Запросите новый код."
+    if "PHONE_CODE_EMPTY" in normalized:
+        return "Введите код подтверждения из Telegram."
+    if "PASSWORD_HASH_INVALID" in normalized:
+        return "Неверный пароль двухэтапной проверки. Попробуйте ещё раз."
+    return "Telegram не принял запрос авторизации. Проверьте данные и попробуйте позже."
 
 
 async def start_qr(account: Optional[dict] = None) -> dict[str, Any]:
