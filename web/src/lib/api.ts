@@ -141,11 +141,19 @@ export class ApiError extends Error {
   }
 }
 
-// Keep production traffic same-origin by default (Cloudflare Pages /api proxy).
-// An explicit env value can still point at a separately hosted API.
+// Production API is hosted on the custom domain. Local development can override
+// this with VITE_API_BASE_URL=/api to use the Vite dev-server proxy.
 const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
-const apiBase = (configuredApiBase || "/api").replace(/\/+$/, "");
+const apiBase = (configuredApiBase || "https://aurogram.dpdns.org").replace(/\/+$/, "");
 let bearerToken: string | null = null;
+
+function apiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/api/") ? path : `/api${path.startsWith("/") ? path : `/${path}`}`;
+  if (apiBase === "/api" || apiBase.endsWith("/api")) {
+    return `${apiBase}${normalizedPath.slice(4)}`;
+  }
+  return `${apiBase}${normalizedPath}`;
+}
 
 export function setBearerToken(token: string | null): void {
   bearerToken = token;
@@ -162,7 +170,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(`${apiBase}${path}`, {
+    response = await fetch(apiUrl(path), {
       ...init,
       headers,
       credentials: "include",
@@ -206,7 +214,7 @@ async function download(path: string): Promise<Blob> {
   if (bearerToken) headers.set("Authorization", `Bearer ${bearerToken}`);
   let response: Response;
   try {
-    response = await fetch(`${apiBase}${path}`, { credentials: "include", headers });
+    response = await fetch(apiUrl(path), { credentials: "include", headers });
   } catch {
     throw new ApiError(translateApiMessage("Не удалось связаться с сервером. Проверьте подключение и настройки API."), 0);
   }

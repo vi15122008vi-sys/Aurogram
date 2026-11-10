@@ -9,7 +9,6 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
@@ -100,8 +99,8 @@ app.mount("/admin/static", StaticFiles(directory=static_dir), name="admin-static
 
 
 @app.get("/", include_in_schema=False)
-async def root() -> RedirectResponse:
-    return RedirectResponse(url="/admin", status_code=307)
+async def root() -> dict[str, str]:
+    return {"service": "Aurogram API", "docs": "/api/docs", "health": "/api/health"}
 
 
 @app.get("/api", include_in_schema=False)

@@ -18,12 +18,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _set_auth_cookie(response: Response, request: Request, token: str | None) -> None:
     if token:
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+        is_secure = request.url.scheme == "https" or forwarded_proto == "https"
         response.set_cookie(
             "auth_token",
             token,
             httponly=True,
-            secure=request.url.scheme == "https",
-            samesite="lax",
+            secure=is_secure,
+            samesite="none" if is_secure else "lax",
             max_age=60 * 60 * 24 * 30,
             path="/",
         )
