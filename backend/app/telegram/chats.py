@@ -6,6 +6,7 @@ from typing import Any, Optional
 from telethon.tl.types import Channel, Chat, User
 
 from app.models import ChatOut
+from app.cache.manager import upsert_message
 from app.telegram.client import get_client
 from app.telegram.floodwait import with_floodwait
 
@@ -76,3 +77,13 @@ async def get_chat(account: dict, chat_id: int) -> Optional[ChatOut]:
         type=_chat_type(entity),  # type: ignore[arg-type]
         members_count=getattr(entity, "participants_count", None),
     )
+
+
+async def fetch_chat_history(account: dict, chat_id: int, limit: int = 150) -> int:
+    """Fetch the latest messages for a chat and persist them to its local cache."""
+    client = await get_client(account["id"], account)
+    messages = await with_floodwait(lambda: client.get_messages(chat_id, limit=limit))
+    ordered = list(reversed(messages or []))
+    for message in ordered:
+        await upsert_message(account["id"], chat_id, message)
+    return len(ordered)

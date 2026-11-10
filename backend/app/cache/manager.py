@@ -147,6 +147,13 @@ async def upsert_message(account_id: str, chat_id: int, msg: Any) -> None:
         media_type = None
         if msg.media:
             media_type = type(msg.media).__name__
+            if doc:
+                for attr in getattr(doc, "attributes", []) or []:
+                    attr_type = type(attr).__name__
+                    if attr_type == "DocumentAttributeAudio" and getattr(attr, "voice", False):
+                        media_type = "voice"
+                    elif attr_type == "DocumentAttributeVideo":
+                        media_type = "video"
         await conn.execute(
             """
             INSERT INTO cached_messages

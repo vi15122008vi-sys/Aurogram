@@ -7,6 +7,18 @@
       <p class="mt-0.5 text-xs text-zinc-500">{{ {'user': 'Личный чат', 'group': 'Группа', 'channel': 'Канал', 'bot': 'Бот'}.get(chat.type, 'Чат') }} · {{ account.name or account.phone }}</p>
     </div>
   </div>
+  {% if fetched is not none %}
+  <p role="status" class="mb-4 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-2 text-sm text-emerald-200">Загружено сообщений: {{ fetched }}</p>
+  {% endif %}
+  <form method="post" action="/admin/chat/{{ chat.id }}/fetch" class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-xl">
+    <input type="hidden" name="account_id" value="{{ account_id }}">
+    <label class="grid gap-1.5 text-xs text-zinc-400">
+      <span>Количество последних сообщений</span>
+      <input type="number" name="limit" min="1" max="1000" value="150" class="h-9 w-36 rounded-lg border border-white/10 bg-zinc-950/70 px-3 font-mono text-sm text-zinc-100 outline-none focus:border-indigo-400">
+    </label>
+    <button type="submit" class="h-9 rounded-lg border border-indigo-300/20 bg-indigo-500/15 px-3 text-xs font-semibold text-indigo-100 transition hover:bg-indigo-500/25">Загрузить историю</button>
+    <span class="text-[11px] text-zinc-500">Максимум 1000 за один запрос</span>
+  </form>
   <div id="message-list" class="space-y-2">
     {% with messages=messages, has_more=has_more, next_offset=next_offset, account_id=account_id, chat_id=chat.id, chat_type=chat.type %}
       {% include "message_page.html" %}

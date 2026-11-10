@@ -6,9 +6,17 @@
     {% endif %}
     {% if message.media_label %}<p class="mb-1.5 inline-flex items-center gap-1.5 rounded-md bg-black/20 px-2 py-1 text-xs text-zinc-300">{{ message.media_label }}</p>{% endif %}
     {% if message.is_voice %}
-      <audio class="admin-audio-player" controls preload="none" src="/admin/media/{{ account_id|urlencode }}/{{ chat_id }}/{{ message.id }}">
+      <audio class="admin-audio-player" controls playsinline webkit-playsinline preload="none" src="/admin/media/{{ account_id|urlencode }}/{{ chat_id }}/{{ message.id }}">
         Ваш браузер не поддерживает воспроизведение аудио.
       </audio>
+      <a class="admin-media-fallback" href="/admin/media/{{ account_id|urlencode }}/{{ chat_id }}/{{ message.id }}" target="_blank" rel="noopener">Скачать / Открыть в плеере</a>
+    {% endif %}
+    {% if message.is_photo %}
+      <img class="admin-media-preview" src="/admin/media/{{ account_id|urlencode }}/{{ chat_id }}/{{ message.id }}" alt="Фото из чата" loading="lazy">
+    {% elif message.is_video %}
+      <video class="admin-video-preview" controls playsinline preload="metadata" src="/admin/media/{{ account_id|urlencode }}/{{ chat_id }}/{{ message.id }}">
+        Ваш браузер не поддерживает воспроизведение видео.
+      </video>
     {% endif %}
     {% if message.text %}<p class="whitespace-pre-wrap break-words text-sm leading-6 text-zinc-100">{{ message.text }}</p>{% endif %}
     <footer class="mt-1.5 flex items-center justify-end gap-2 text-[10px] text-zinc-500">

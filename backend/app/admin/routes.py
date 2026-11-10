@@ -7,6 +7,7 @@ import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -18,6 +19,7 @@ from app.cache.index import get_listener_heartbeat
 from app.cache.stats import global_stats, growth_30d
 from app.config import get_settings
 from app.database import fetchall
+from app.telegram.chats import fetch_chat_history
 from app.telegram.media import download_message_media, resolve_media_file
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -281,17 +283,21 @@ async def _admin_message_page(account_id: str, chat_id: int, offset: int) -> tup
     for row in rows:
         row["time_label"] = _admin_time(row.get("date"))
         row["is_voice"] = bool(row.get("waveform_data")) or (
-            row.get("media_type") == "MessageMediaDocument"
+            row.get("media_type") in {"MessageMediaDocument", "voice"}
             and str(row.get("media_mime") or "").startswith("audio/")
-        )
+        ) or row.get("media_type") == "voice"
+        row["is_photo"] = row.get("media_type") in {"MessageMediaPhoto", "photo"} or str(row.get("media_mime") or "").startswith("image/")
+        row["is_video"] = row.get("media_type") in {"MessageMediaVideo", "video"} or str(row.get("media_mime") or "").startswith("video/")
         row["media_label"] = (
             "🎙 Голосовое сообщение" if row["is_voice"]
+            else "🎬 Видео" if row["is_video"]
+            else "📷 Фото" if row["is_photo"]
             else media_labels.get(row.get("media_type"), "📎 Медиа") if row.get("media_type")
             else None
         )
         if row.get("deleted"):
             row["text"] = "Сообщение удалено"
-        elif row["is_voice"] and not row.get("text"):
+        elif (row["is_voice"] or row["is_photo"] or row["is_video"]) and not row.get("text"):
             row["text"] = ""
         elif not row.get("text") and row.get("media_type"):
             row["text"] = "Медиа-сообщение"
@@ -319,11 +325,32 @@ async def admin_media(
     if path is None or not path.is_file():
         return HTMLResponse("Медиафайл не найден", status_code=404)
     await touch_cached_media(account_id, path, chat_id, message_id)
-    media_type, _ = mimetypes.guess_type(path.name)
+    conn = await connect_cache(account_id)
+    try:
+        cur = await conn.execute(
+            """SELECT m.media_type, m.waveform_data,
+                      (SELECT cm.mime FROM cached_media cm
+                       WHERE cm.chat_id = m.chat_id AND cm.message_id = m.id
+                       ORDER BY cm.id DESC LIMIT 1) AS media_mime
+               FROM cached_messages m WHERE m.chat_id = ? AND m.id = ? LIMIT 1""",
+            (chat_id, message_id),
+        )
+        cached_message = await cur.fetchone()
+    finally:
+        await conn.close()
+    media_type = (cached_message["media_mime"] if cached_message else None) or mimetypes.guess_type(path.name)[0]
+    if path.suffix.lower() in {".ogg", ".opus"}:
+        media_type = "audio/ogg"
+    elif cached_message and (cached_message["media_type"] == "voice" or cached_message["waveform_data"]):
+        media_type = "audio/ogg"
+    elif cached_message and cached_message["media_type"] == "video":
+        media_type = media_type if media_type and media_type.startswith("video/") else "video/mp4"
+    elif cached_message and cached_message["media_type"] in {"MessageMediaPhoto", "photo"}:
+        media_type = media_type if media_type and media_type.startswith("image/") else "image/jpeg"
     return FileResponse(
         path,
         media_type=media_type or "application/octet-stream",
-        headers={"Cache-Control": "private, max-age=300"},
+        headers={"Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff"},
     )
 
 
@@ -355,6 +382,7 @@ async def admin_chat(
     request: Request,
     chat_id: int,
     account_id: str = "",
+    fetched: int | None = None,
 ) -> Response:
     if not _admin_session(request):
         return RedirectResponse("/admin/login", status_code=303)
@@ -382,7 +410,25 @@ async def admin_chat(
         "messages": messages,
         "has_more": has_more,
         "next_offset": len(messages),
+        "fetched": fetched,
     })
+
+
+@router.post("/chat/{chat_id}/fetch")
+async def admin_fetch_chat_history(
+    request: Request,
+    chat_id: int,
+    account_id: str = Form(...),
+    limit: int = Form(default=150, ge=1, le=1000),
+) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    account = await _admin_account(account_id)
+    if not account:
+        return HTMLResponse("Аккаунт не найден", status_code=404)
+    fetched = await fetch_chat_history(account, chat_id, limit=limit)
+    query = urlencode({"account_id": account_id, "fetched": fetched})
+    return RedirectResponse(f"/admin/chat/{chat_id}?{query}", status_code=303)
 
 
 @router.get("/chat/{chat_id}/messages", response_class=HTMLResponse)

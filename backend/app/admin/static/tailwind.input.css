@@ -76,6 +76,29 @@ body {
   .admin-audio-player::-webkit-media-controls-panel {
     background-color: #18181b;
   }
+
+  .admin-media-preview,
+  .admin-video-preview {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-top: 8px;
+    border-radius: 8px;
+    background: rgba(9, 9, 11, 0.65);
+  }
+
+  .admin-media-fallback {
+    display: inline-block;
+    margin-top: 0.4rem;
+    color: #a5b4fc;
+    font-size: 0.7rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .admin-media-fallback:hover {
+    color: #c4b5fd;
+  }
 }
 
 code,
