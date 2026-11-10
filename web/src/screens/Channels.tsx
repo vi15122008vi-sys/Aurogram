@@ -62,9 +62,9 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
       {filteredChannels.length ? (
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           {filteredChannels.map((channel) => (
-            <article key={channel.id} className="rounded-xl border border-line bg-surface p-3">
+            <article key={channel.id} className="group/card rounded-xl border border-border bg-surface/90 p-3.5 transition duration-200 hover:-translate-y-0.5 hover:border-accent/25 hover:bg-surface hover:shadow-[0_12px_36px_rgb(0_0_0_/_18%)]">
               <button type="button" onClick={() => onOpen(channel)} className="group flex w-full items-center gap-3 text-left">
-                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent/10 text-sm font-semibold text-accent">{channel.title.slice(0, 1).toLocaleUpperCase()}</span>
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/15 bg-accent/10 text-sm font-semibold text-accent transition group-hover/card:border-accent/30">{channel.title.slice(0, 1).toLocaleUpperCase()}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2"><span className="truncate text-sm font-semibold text-ink">{channel.title}</span>{(channel.scheduled_count ?? 0) > 0 && <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent"><span className="size-1.5 rounded-full bg-accent" />{channel.scheduled_count} отложено</span>}</span>
                   <span className="mt-1 block truncate text-xs text-muted">{channel.username ? `@${channel.username}` : `ID ${channel.id}`}</span>
@@ -72,9 +72,9 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
                 </span>
                 <ArrowRight size={15} className="shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-accent" />
               </button>
-              <div className="mt-3 flex gap-2 border-t border-line pt-3">
-                <button type="button" onClick={() => (onPublish ?? onOpen)(channel)} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-xs font-medium text-white hover:bg-accent-strong"><Send size={13} />Опубликовать</button>
-                <button type="button" onClick={() => (onStatistics ?? onOpen)(channel)} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-2 text-xs font-medium text-ink hover:bg-raised"><ChartNoAxesColumn size={13} />Статистика</button>
+              <div className="mt-3 flex gap-2 border-t border-border pt-3">
+                <button type="button" onClick={() => (onPublish ?? onOpen)(channel)} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-xs font-medium text-white transition hover:bg-accent-strong"><Send size={13} strokeWidth={1.5} />Опубликовать</button>
+                <button type="button" onClick={() => (onStatistics ?? onOpen)(channel)} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-2 text-xs font-medium text-ink transition hover:border-accent/20 hover:bg-surfaceRaised"><ChartNoAxesColumn size={13} strokeWidth={1.5} />Статистика</button>
               </div>
             </article>
           ))}

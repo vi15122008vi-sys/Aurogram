@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { AudioLines } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Layout } from "./components/Layout";
+import { SplashScreen } from "./components/SplashScreen";
 import type { AppTab } from "./components/BottomNav";
 import { ApiKey } from "./screens/ApiKey";
 import { Code } from "./screens/Code";
@@ -127,7 +128,7 @@ export default function App() {
   }
 
   if (checkingSession) {
-    return <main className="grid min-h-screen place-items-center"><div className="flex items-center gap-3 text-sm font-medium text-muted"><AudioLines className="animate-pulse text-accent" size={20} />Aurogram</div></main>;
+    return <SplashScreen />;
   }
 
   if (account) {
@@ -138,14 +139,19 @@ export default function App() {
     );
   }
 
-  if (authScreen === "apiKey") {
-    return <ApiKey busy={busy} error={error} onSubmit={saveApiKey} onBack={() => { setError(null); setAuthScreen("phone"); }} />;
-  }
-  if (authScreen === "code" && pending) {
-    return <Code phone={pending.phone} busy={busy} error={error} onSubmit={verifyCode} onBack={() => { setError(null); setAuthScreen("phone"); }} />;
-  }
-  if (authScreen === "twoFactor") {
-    return <TwoFactor busy={busy} error={error} onSubmit={verifyPassword} onBack={() => { setError(null); setAuthScreen("code"); }} />;
-  }
-  return <PhoneInput busy={busy} error={error} onSubmit={sendCode} onApiKey={() => { setError(null); setAuthScreen("apiKey"); }} />;
+  const authView = authScreen === "apiKey"
+    ? <ApiKey busy={busy} error={error} onSubmit={saveApiKey} onBack={() => { setError(null); setAuthScreen("phone"); }} />
+    : authScreen === "code" && pending
+      ? <Code phone={pending.phone} busy={busy} error={error} onSubmit={verifyCode} onBack={() => { setError(null); setAuthScreen("phone"); }} />
+      : authScreen === "twoFactor"
+        ? <TwoFactor busy={busy} error={error} onSubmit={verifyPassword} onBack={() => { setError(null); setAuthScreen("code"); }} />
+        : <PhoneInput busy={busy} error={error} onSubmit={sendCode} onApiKey={() => { setError(null); setAuthScreen("apiKey"); }} />;
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div key={authScreen} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+        {authView}
+      </motion.div>
+    </AnimatePresence>
+  );
 }

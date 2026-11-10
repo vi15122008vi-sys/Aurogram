@@ -7,6 +7,8 @@ export default {
       colors: {
         canvas: "var(--canvas)",
         surface: "var(--surface)",
+        surfaceRaised: "var(--surface-raised)",
+        border: "var(--border)",
         raised: "var(--raised)",
         ink: "var(--ink)",
         muted: "var(--muted)",

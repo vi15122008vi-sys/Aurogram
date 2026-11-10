@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { motion } from "framer-motion";
 import { ArrowDownToLine, LoaderCircle, Send } from "lucide-react";
 import { api, type MessageRecord } from "../lib/api";
 import { VoicePlayer } from "../components/VoicePlayer";
@@ -38,6 +39,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   const [hasMore, setHasMore] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [lastSentId, setLastSentId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dateGroups = messages.reduce<{ label: string; messages: MessageRecord[] }[]>((groups, message) => {
     const label = displayDateDivider(message.date);
@@ -92,6 +94,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     try {
       const sent = await api.messages.send(chatId, body);
       setMessages((current) => [...current, sent]);
+      setLastSentId(sent.id);
       setText("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось отправить сообщение");
@@ -101,9 +104,9 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-line bg-surface">
+    <section className="overflow-hidden rounded-xl border border-border bg-surface/90 shadow-[0_12px_36px_rgb(0_0_0_/_12%)]">
       {hasMore && <div className="border-b border-line p-2 text-center"><button type="button" onClick={loadOlder} disabled={loadingOlder} className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs font-medium text-muted hover:bg-raised disabled:opacity-50"><ArrowDownToLine size={14} />{loadingOlder ? "Загружаем…" : "Загрузить предыдущие"}</button></div>}
-      <div className="max-h-[55vh] min-h-48 space-y-3 overflow-y-auto bg-canvas p-3">
+      <div className="max-h-[55vh] min-h-48 space-y-3 overflow-y-auto bg-canvas/70 p-3 sm:p-4">
         {loading && <div className="flex justify-center py-8 text-muted"><LoaderCircle size={18} className="animate-spin" /></div>}
         {!loading && !messages.length && <p className="py-10 text-center text-sm text-muted">Сообщений нет</p>}
         {dateGroups.map((group) => (
@@ -111,8 +114,8 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
             <div className="sticky top-0 z-10 flex justify-center py-1"><span className="rounded-lg border border-line bg-surface px-2.5 py-1 font-mono text-[9px] capitalize text-muted">{group.label}</span></div>
             <div className="space-y-3 pt-2">
               {group.messages.map((message) => (
-                <article key={`${message.chat_id}:${message.id}`} className={`flex ${message.out ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[88%] min-w-[min(16rem,88%)] rounded-xl border px-3 py-2.5 sm:max-w-[76%] ${message.out ? "border-line bg-accent/15" : "border-line bg-raised"}`}>
+                <motion.article key={`${message.chat_id}:${message.id}`} initial={message.id === lastSentId ? { opacity: 0, scale: 0.96, y: 6 } : false} animate={message.id === lastSentId ? { opacity: 1, scale: [0.96, 1.02, 1], y: 0 } : undefined} transition={message.id === lastSentId ? { duration: 0.34, ease: [0.2, 0.85, 0.3, 1] } : undefined} onAnimationComplete={() => { if (message.id === lastSentId) setLastSentId(null); }} className={`flex ${message.out ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[88%] min-w-[min(16rem,88%)] rounded-xl border px-3 py-2.5 sm:max-w-[76%] ${message.out ? "border-accent/15 bg-accent/12 shadow-[inset_0_1px_0_rgb(255_255_255_/_4%)]" : "border-border bg-surfaceRaised"}`}>
                     {!message.out && message.sender_name && <p className="mb-1 text-[10px] font-semibold text-accent">{message.sender_name}</p>}
                     {message.text && <p className="whitespace-pre-wrap break-words text-sm leading-5 text-ink">{message.text}</p>}
                     {message.media_type === "voice" && <VoicePlayer chatId={chatId} messageId={message.id} durationHint={message.duration} waveform={message.waveform_data} />}
@@ -123,7 +126,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
                     )}
                     <p className="mt-1.5 text-right font-mono text-[9px] tabular-nums text-muted">{displayDate(message.date)}</p>
                   </div>
-                </article>
+                </motion.article>
               ))}
             </div>
           </div>

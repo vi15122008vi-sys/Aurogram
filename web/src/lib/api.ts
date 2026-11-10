@@ -133,7 +133,10 @@ export class ApiError extends Error {
   }
 }
 
-const apiBase = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+// Keep production traffic same-origin by default (Cloudflare Pages /api proxy).
+// An explicit env value can still point at a separately hosted API.
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const apiBase = (configuredApiBase || "/api").replace(/\/+$/, "");
 let bearerToken: string | null = null;
 
 export function setBearerToken(token: string | null): void {
@@ -149,18 +152,36 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Authorization", `Bearer ${bearerToken}`);
   }
 
-  const response = await fetch(`${apiBase}${path}`, {
-    ...init,
-    headers,
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}${path}`, {
+      ...init,
+      headers,
+      credentials: "include",
+    });
+  } catch {
+    throw new ApiError("Не удалось связаться с сервером. Проверьте подключение и настройки API.", 0);
+  }
   const body = response.status === 204 ? undefined : await response.json().catch(() => undefined);
 
   if (!response.ok) {
-    const detail = typeof body?.detail === "string" ? body.detail : "Не удалось выполнить запрос";
-    throw new ApiError(detail, response.status);
+    throw new ApiError(readableApiError(body?.detail, response.status), response.status);
   }
   return body as T;
+}
+
+function readableApiError(detail: unknown, status: number): string {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => typeof item?.msg === "string" ? item.msg : null)
+      .filter((message): message is string => Boolean(message));
+    if (messages.length) return `Проверьте данные: ${messages.join("; ")}`;
+  }
+  if (status === 401) return "Сессия истекла. Войдите в аккаунт ещё раз.";
+  if (status === 429) return "Слишком много попыток. Подождите немного и попробуйте снова.";
+  if (status >= 500) return "На сервере произошла ошибка. Попробуйте позже.";
+  return "Не удалось выполнить запрос. Проверьте введённые данные.";
 }
 
 async function download(path: string): Promise<Blob> {
@@ -169,7 +190,7 @@ async function download(path: string): Promise<Blob> {
   const response = await fetch(`${apiBase}${path}`, { credentials: "include", headers });
   if (!response.ok) {
     const body = await response.json().catch(() => undefined);
-    throw new ApiError(typeof body?.detail === "string" ? body.detail : "Не удалось загрузить файл", response.status);
+    throw new ApiError(readableApiError(body?.detail, response.status), response.status);
   }
   return response.blob();
 }
