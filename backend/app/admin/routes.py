@@ -3,20 +3,22 @@ from __future__ import annotations
 import hmac
 import csv
 import io
+import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.antispam.log import read_log
-from app.cache.manager import connect_cache
+from app.cache.manager import connect_cache, touch_cached_media
 from app.cache.index import get_listener_heartbeat
 from app.cache.stats import global_stats, growth_30d
 from app.config import get_settings
 from app.database import fetchall
+from app.telegram.media import download_message_media, resolve_media_file
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -250,6 +252,10 @@ async def _admin_message_page(account_id: str, chat_id: int, offset: int) -> tup
     try:
         cur = await conn.execute(
             """SELECT m.id, m.sender_id, m.text, m.date, m.out, m.edited, m.deleted, m.media_type,
+                      m.waveform_data,
+                      (SELECT cm.mime FROM cached_media cm
+                       WHERE cm.chat_id = m.chat_id AND cm.message_id = m.id
+                       ORDER BY cm.id DESC LIMIT 1) AS media_mime,
                       cm.name AS sender_name
                FROM cached_messages m
                LEFT JOIN cached_members cm ON cm.chat_id = m.chat_id AND cm.user_id = m.sender_id
@@ -274,15 +280,51 @@ async def _admin_message_page(account_id: str, chat_id: int, offset: int) -> tup
     }
     for row in rows:
         row["time_label"] = _admin_time(row.get("date"))
-        row["media_label"] = media_labels.get(row.get("media_type"), "📎 Медиа") if row.get("media_type") else None
+        row["is_voice"] = bool(row.get("waveform_data")) or (
+            row.get("media_type") == "MessageMediaDocument"
+            and str(row.get("media_mime") or "").startswith("audio/")
+        )
+        row["media_label"] = (
+            "🎙 Голосовое сообщение" if row["is_voice"]
+            else media_labels.get(row.get("media_type"), "📎 Медиа") if row.get("media_type")
+            else None
+        )
         if row.get("deleted"):
             row["text"] = "Сообщение удалено"
+        elif row["is_voice"] and not row.get("text"):
+            row["text"] = ""
         elif not row.get("text") and row.get("media_type"):
             row["text"] = "Медиа-сообщение"
         elif not row.get("text"):
             row["text"] = ""
         row["out"] = bool(row.get("out"))
     return rows, has_more
+
+
+@router.get("/media/{account_id}/{chat_id}/{message_id}")
+async def admin_media(
+    request: Request,
+    account_id: str,
+    chat_id: int,
+    message_id: int,
+) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    account = await _admin_account(account_id)
+    if not account:
+        return HTMLResponse("Аккаунт не найден", status_code=404)
+    path = resolve_media_file(account_id, chat_id, message_id)
+    if path is None or not path.is_file():
+        path = await download_message_media(account, chat_id, message_id)
+    if path is None or not path.is_file():
+        return HTMLResponse("Медиафайл не найден", status_code=404)
+    await touch_cached_media(account_id, path, chat_id, message_id)
+    media_type, _ = mimetypes.guess_type(path.name)
+    return FileResponse(
+        path,
+        media_type=media_type or "application/octet-stream",
+        headers={"Cache-Control": "private, max-age=300"},
+    )
 
 
 @router.get("/chats", response_class=HTMLResponse)

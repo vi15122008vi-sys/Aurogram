@@ -1,10 +1,15 @@
 {% for message in messages %}
 <div class="flex {{ 'justify-end' if message.out else 'justify-start' }}">
-  <article class="max-w-[88%] rounded-2xl border px-3.5 py-2.5 sm:max-w-[74%] {{ 'border-indigo-400/20 bg-indigo-500/10' if message.out else 'border-white/10 bg-zinc-900/80' }}">
+  <article class="admin-glass admin-message {{ 'admin-message-out' if message.out else 'admin-message-in' }} max-w-[88%] rounded-2xl px-3.5 py-2.5 sm:max-w-[74%]">
     {% if chat_type in ['group', 'channel'] %}
       <p class="mb-1 text-xs font-medium {{ 'text-indigo-300' if message.out else 'text-emerald-300' }}">{{ 'Вы' if message.out else (message.sender_name or ('Участник · ' ~ message.sender_id if message.sender_id else 'Участник')) }}</p>
     {% endif %}
     {% if message.media_label %}<p class="mb-1.5 inline-flex items-center gap-1.5 rounded-md bg-black/20 px-2 py-1 text-xs text-zinc-300">{{ message.media_label }}</p>{% endif %}
+    {% if message.is_voice %}
+      <audio class="admin-audio-player" controls preload="none" src="/admin/media/{{ account_id|urlencode }}/{{ chat_id }}/{{ message.id }}">
+        Ваш браузер не поддерживает воспроизведение аудио.
+      </audio>
+    {% endif %}
     {% if message.text %}<p class="whitespace-pre-wrap break-words text-sm leading-6 text-zinc-100">{{ message.text }}</p>{% endif %}
     <footer class="mt-1.5 flex items-center justify-end gap-2 text-[10px] text-zinc-500">
       {% if message.edited %}<span>изменено</span>{% endif %}

@@ -11,6 +11,73 @@ body {
   font-family: "Inter Tight", sans-serif;
 }
 
+@layer components {
+  .admin-body {
+    position: relative;
+    isolation: isolate;
+    background-color: #09090b;
+    background-image:
+      radial-gradient(ellipse at 8% 0%, rgba(99, 102, 241, 0.13), transparent 38rem),
+      radial-gradient(ellipse at 92% 12%, rgba(139, 92, 246, 0.09), transparent 34rem);
+    background-attachment: fixed;
+  }
+
+  .admin-body::before {
+    position: fixed;
+    z-index: -1;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.025), transparent 55%);
+    content: "";
+    pointer-events: none;
+  }
+
+  .admin-glass {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 18px 55px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  .admin-sidebar {
+    background: rgba(10, 10, 11, 0.76);
+  }
+
+  .admin-topbar {
+    border-radius: 1rem;
+    background: rgba(15, 15, 18, 0.7);
+  }
+
+  .admin-message {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .admin-message-in {
+    background: rgba(24, 24, 27, 0.68);
+  }
+
+  .admin-message-out {
+    border-color: rgba(129, 140, 248, 0.28);
+    background: rgba(99, 102, 241, 0.12);
+  }
+
+  .admin-audio-player {
+    display: block;
+    width: min(360px, 72vw);
+    height: 42px;
+    margin-top: 0.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9999px;
+    background: rgba(9, 9, 11, 0.8);
+    color-scheme: dark;
+    accent-color: #818cf8;
+  }
+
+  .admin-audio-player::-webkit-media-controls-panel {
+    background-color: #18181b;
+  }
+}
+
 code,
 .font-mono {
   font-family: "JetBrains Mono", monospace;

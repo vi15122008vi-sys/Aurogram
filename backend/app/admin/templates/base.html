@@ -10,9 +10,9 @@
   <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/json-enc.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
 </head>
-<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+<body class="admin-body min-h-screen bg-zinc-950 text-zinc-100 antialiased">
   <div class="min-h-screen lg:grid lg:grid-cols-[220px_1fr]">
-    <aside class="border-b border-white/10 bg-zinc-950 p-4 lg:min-h-screen lg:border-b-0 lg:border-r">
+    <aside class="admin-glass admin-sidebar border-b border-white/10 p-4 lg:min-h-screen lg:border-b-0 lg:border-r">
       <a href="/admin" class="flex items-center gap-3 text-lg font-semibold">
         <span class="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500 text-sm">A</span>
         Aurogram
@@ -27,8 +27,8 @@
         <button class="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-zinc-400 hover:bg-white/5">Выйти</button>
       </form>
     </aside>
-    <main class="min-w-0 p-5 md:p-8">
-      <header class="mb-7 flex items-center justify-between border-b border-white/10 pb-5">
+    <main class="admin-main min-w-0 p-5 md:p-8">
+      <header class="admin-glass admin-topbar mb-7 flex items-center justify-between border-b border-white/10 px-4 py-4">
         <div>
           <p class="text-xs uppercase tracking-wider text-zinc-500">Aurogram / Admin</p>
           <h1 class="mt-1 text-2xl font-semibold">{{ title|default('Обзор') }}</h1>
