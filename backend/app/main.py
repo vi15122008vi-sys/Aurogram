@@ -63,7 +63,11 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(dict.fromkeys([*settings.cors_origin_list(), "https://aurogram.pages.dev"])),
+    allow_origins=list(dict.fromkeys([
+        *settings.cors_origin_list(),
+        "https://aurogram.pages.dev",
+        "http://localhost:5173",
+    ])),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Auth-Token", "X-Admin-Action-Token"],
