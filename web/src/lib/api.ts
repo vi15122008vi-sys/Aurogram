@@ -41,11 +41,38 @@ export interface BotRecord {
 export interface ChatRecord {
   id: number;
   title: string;
+  username?: string | null;
   type: "user" | "group" | "channel" | "bot";
   archived?: boolean;
   unread: number;
   last_message: string | null;
   last_message_date?: string | null;
+}
+
+export interface ChatFolder {
+  id: number;
+  name: string;
+  chat_ids: number[];
+}
+
+export interface GlobalSearchResult {
+  chats: (Pick<ChatRecord, "id" | "type" | "title" | "username" | "unread" | "last_message_date"> & { last_message_id: number | null })[];
+  messages: { chat_id: number; chat_title: string | null; chat_type: ChatRecord["type"] | null; message_id: number; text: string | null; date: string | null; out: number }[];
+}
+
+export interface PrivacyPreferences {
+  hide_online: boolean;
+  no_read_receipts: boolean;
+  hide_device_type: boolean;
+}
+
+export interface StoryPeer {
+  peer_id: number;
+  title: string;
+  username: string | null;
+  count: number;
+  unread: boolean;
+  latest_story_id: number;
 }
 
 export interface ChannelDetails {
@@ -116,6 +143,8 @@ export interface MessageRecord {
   media_url: string | null;
   duration: number | null;
   waveform_data: number[] | null;
+  reactions: { emoji: string; count: number; chosen: boolean }[];
+  pinned: boolean;
 }
 
 export interface EditorPreview {
@@ -161,8 +190,18 @@ export function setBearerToken(token: string | null): void {
   bearerToken = token;
 }
 
+export function storyAvatarUrl(peerId: number): string {
+  return apiUrl(`/chats/stories/${peerId}/avatar`);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
+  let deviceId = localStorage.getItem("aurogram.device_id");
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem("aurogram.device_id", deviceId);
+  }
+  headers.set("X-Device-Id", deviceId);
   if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -260,6 +299,7 @@ export const api = {
   },
   channels: {
     list: () => request<ChannelRecord[]>("/channels"),
+    admined: () => request<ChannelRecord[]>("/channels/admined"),
     get: (channelId: number) => request<ChannelDetails>(`/channels/${channelId}`),
     antispam: {
       get: (channelId: number) => request<AntispamSettings>(`/channels/${channelId}/antispam`),
@@ -298,6 +338,11 @@ export const api = {
   },
   chats: {
     list: (archived = false) => request<ChatRecord[]>(`/chats?archived=${archived}`),
+    stories: () => request<StoryPeer[]>("/chats/stories"),
+    folders: () => request<ChatFolder[]>("/chats/folders"),
+    createFolder: (name: string) => request<ChatFolder>("/chats/folders", { method: "POST", body: json({ name }) }),
+    assignFolder: (chatId: number, folderId: number | null) => request<{ chat_id: number; folder_id: number | null }>(`/chats/${chatId}/folder`, { method: "PUT", body: json({ folder_id: folderId }) }),
+    search: (query: string) => request<GlobalSearchResult>(`/chats/search/global?q=${encodeURIComponent(query)}`),
     archive: (chatId: number, archived: boolean) =>
       request<{ chat_id: number; archived: boolean }>(`/chats/${chatId}/archive`, {
         method: "PUT",
@@ -316,8 +361,22 @@ export const api = {
       request<MessageRecord[]>(`/messages?chat_id=${chatId}&limit=${limit}&offset_id=${offsetId}&ghost=true`),
     send: (chatId: number, text: string) =>
       request<MessageRecord>("/messages", { method: "POST", body: json({ chat_id: chatId, text }) }),
+    react: (chatId: number, messageId: number, emoji: "👍" | "❤️" | "🔥" | "😂") =>
+      request<MessageRecord>(`/messages/${chatId}/${messageId}/reaction`, { method: "PUT", body: json({ emoji }) }),
+    pin: (chatId: number, messageId: number, pinned: boolean) =>
+      request<MessageRecord>(`/messages/${chatId}/${messageId}/pin`, { method: "PUT", body: json({ pinned }) }),
+    sendVideoNote: (chatId: number, video: Blob) => {
+      const form = new FormData();
+      form.append("chat_id", String(chatId));
+      form.append("video", video, "video-note.webm");
+      return request<MessageRecord>("/messages/video-note", { method: "POST", body: form });
+    },
     media: (chatId: number, messageId: number) =>
       download(`/messages/${chatId}/${messageId}/media`),
+  },
+  privacy: {
+    get: () => request<PrivacyPreferences>("/privacy"),
+    update: (preferences: Partial<PrivacyPreferences>) => request<PrivacyPreferences>("/privacy", { method: "PUT", body: json(preferences) }),
   },
 };
 

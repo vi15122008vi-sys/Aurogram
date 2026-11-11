@@ -273,6 +273,34 @@ async def list_cached_messages(
         await conn.close()
 
 
+async def search_cached(account_id: str, query: str, limit: int = 40) -> dict[str, list[dict[str, Any]]]:
+    """Search only this account's local chat and message cache."""
+    conn = await connect_cache(account_id)
+    try:
+        await conn.create_function("casefold", 1, lambda value: str(value or "").casefold())
+        cur = await conn.execute(
+            """SELECT id, type, COALESCE(title, CAST(id AS TEXT)) AS title, username, unread, last_message_date, last_message_id
+               FROM cached_chats WHERE instr(casefold(title), casefold(?)) > 0
+                  OR instr(casefold(username), casefold(?)) > 0
+               ORDER BY last_message_date DESC LIMIT ?""",
+            (query.strip(), query.strip(), limit),
+        )
+        chats = [dict(row) for row in await cur.fetchall()]
+        cur = await conn.execute(
+            """SELECT m.chat_id, c.title AS chat_title, c.type AS chat_type,
+                      m.id AS message_id, m.text, m.date, m.out
+               FROM cached_messages AS m
+               LEFT JOIN cached_chats AS c ON c.id = m.chat_id
+               WHERE instr(casefold(m.text), casefold(?)) > 0
+               ORDER BY m.date DESC LIMIT ?""",
+            (query.strip(), limit),
+        )
+        messages = [dict(row) for row in await cur.fetchall()]
+        return {"chats": chats, "messages": messages}
+    finally:
+        await conn.close()
+
+
 async def purge_account_cache(account_id: str) -> None:
     import shutil
 

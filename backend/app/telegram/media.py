@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Optional
 import mimetypes
 
+from telethon.errors import FileReferenceExpiredError
+
 from app.cache.manager import account_media_root
 from app.config import get_settings
 from app.telegram.client import get_client
@@ -28,9 +30,21 @@ async def download_message_media(
         return None
     dest_dir = account_media_root(account["id"]) / "media" / str(chat_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
-    path = await with_floodwait(
-        lambda: client.download_media(msg, file=str(dest_dir / str(message_id)))
-    )
+    try:
+        path = await with_floodwait(
+            lambda: client.download_media(msg, file=str(dest_dir / str(message_id)))
+        )
+    except FileReferenceExpiredError:
+        # Telegram file references are short-lived; fetch a fresh message object once and retry.
+        fresh_message = await with_floodwait(lambda: client.get_messages(chat_id, ids=message_id))
+        if not fresh_message or not fresh_message.media:
+            return None
+        try:
+            path = await with_floodwait(
+                lambda: client.download_media(fresh_message, file=str(dest_dir / str(message_id)))
+            )
+        except FileReferenceExpiredError:
+            return None
     if not path:
         return None
     result = Path(path)

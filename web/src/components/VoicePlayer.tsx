@@ -67,8 +67,8 @@ export function VoicePlayer({ chatId, messageId, durationHint, waveform }: Voice
   const progress = duration ? current / duration : 0;
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5">
-      <button type="button" onClick={togglePlayback} disabled={loading || error} aria-label={playing ? t("Приостановить голосовое сообщение") : t("Воспроизвести голосовое сообщение")} className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-white disabled:bg-raised">
+    <div className="flex min-w-0 items-center gap-3 rounded-full border border-accent/15 bg-gradient-to-r from-accent/15 via-surface/90 to-accent/10 px-3 py-2.5 shadow-[inset_0_1px_0_rgb(255_255_255_/_7%)]">
+      <button type="button" onClick={togglePlayback} disabled={loading || error} aria-label={playing ? t("Приостановить голосовое сообщение") : t("Воспроизвести голосовое сообщение")} className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-white shadow-[0_3px_12px_color-mix(in_srgb,var(--accent)_30%,transparent)] disabled:bg-raised">
         {loading ? <Volume2 size={16} /> : playing ? <Pause size={16} /> : <Play size={16} />}
       </button>
       <audio

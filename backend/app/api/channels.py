@@ -24,7 +24,7 @@ from app.models import (
     WordImport,
     WordPatch,
 )
-from app.telegram.channels import get_channel_full, list_channels
+from app.telegram.channels import get_channel_full, list_admined_public_channels, list_channels
 
 router = APIRouter(prefix="/channels", tags=["channels"])
 
@@ -48,6 +48,13 @@ async def channels(
     account: dict[str, Any] = Depends(get_current_account),
 ) -> list[ChannelOut]:
     return await list_channels(account)
+
+
+@router.get("/admined", response_model=list[ChannelOut])
+async def admined_channels(
+    account: dict[str, Any] = Depends(get_current_account),
+) -> list[ChannelOut]:
+    return await list_admined_public_channels(account)
 
 
 @router.get("/{channel_id}")

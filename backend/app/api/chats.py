@@ -7,8 +7,9 @@ from pydantic import BaseModel, Field
 
 from app.deps import get_current_account
 from app.database import execute, fetchall
+from app.cache.manager import search_cached
 from app.models import ChatOut, MemberOut, MessageOut
-from app.telegram.chats import get_chat, list_chats
+from app.telegram.chats import get_chat, get_story_avatar, list_chats, list_stories
 from app.telegram.members import list_admins, list_members
 from app.telegram.messages import delete_message, list_messages, send_message
 
@@ -24,6 +25,69 @@ class ChatArchiveUpdate(BaseModel):
     archived: bool
 
 
+class ChatFolderCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+
+
+class ChatFolderAssignment(BaseModel):
+    folder_id: int | None = None
+
+
+@router.get("/search/global")
+async def global_search(
+    q: str = Query(min_length=2, max_length=100),
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, list[dict[str, Any]]]:
+    return await search_cached(account["id"], q, limit=40)
+
+
+@router.get("/folders")
+async def list_chat_folders(
+    account: dict[str, Any] = Depends(get_current_account),
+) -> list[dict[str, Any]]:
+    folders = await fetchall("SELECT id, name FROM chat_folders WHERE account_id = ? ORDER BY created_at, id", (account["id"],))
+    assignments = await fetchall("SELECT folder_id, chat_id FROM chat_folder_chats WHERE account_id = ?", (account["id"],))
+    chat_ids: dict[int, list[int]] = {}
+    for row in assignments:
+        chat_ids.setdefault(int(row["folder_id"]), []).append(int(row["chat_id"]))
+    return [{"id": int(folder["id"]), "name": folder["name"], "chat_ids": chat_ids.get(int(folder["id"]), [])} for folder in folders]
+
+
+@router.post("/folders", status_code=201)
+async def create_chat_folder(
+    payload: ChatFolderCreate,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Название папки не может быть пустым")
+    existing = await fetchone("SELECT id FROM chat_folders WHERE account_id = ? AND name = ? COLLATE NOCASE", (account["id"], name))
+    if existing:
+        raise HTTPException(status_code=409, detail="Папка с таким названием уже существует")
+    folder_id = await execute("INSERT INTO chat_folders (account_id, name) VALUES (?, ?)", (account["id"], name))
+    return {"id": folder_id, "name": name, "chat_ids": []}
+
+
+@router.put("/{chat_id}/folder")
+async def assign_chat_folder(
+    chat_id: int,
+    payload: ChatFolderAssignment,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    if payload.folder_id is None:
+        await execute("DELETE FROM chat_folder_chats WHERE account_id = ? AND chat_id = ?", (account["id"], chat_id))
+    else:
+        folder = await fetchone("SELECT id FROM chat_folders WHERE id = ? AND account_id = ?", (payload.folder_id, account["id"]))
+        if not folder:
+            raise HTTPException(status_code=404, detail="Папка не найдена")
+        await execute(
+            """INSERT INTO chat_folder_chats (account_id, folder_id, chat_id) VALUES (?, ?, ?)
+               ON CONFLICT(account_id, chat_id) DO UPDATE SET folder_id = excluded.folder_id""",
+            (account["id"], payload.folder_id, chat_id),
+        )
+    return {"chat_id": chat_id, "folder_id": payload.folder_id}
+
+
 @router.get("", response_model=list[ChatOut])
 async def chats(
     limit: int = Query(default=100, ge=1, le=200),
@@ -36,6 +100,24 @@ async def chats(
     )
     archived_ids = {int(row["chat_id"]) for row in rows}
     return await list_chats(account, limit=limit, archived_ids=archived_ids, archived=archived)
+
+
+@router.get("/stories")
+async def stories(
+    account: dict[str, Any] = Depends(get_current_account),
+) -> list[dict[str, Any]]:
+    return await list_stories(account)
+
+
+@router.get("/stories/{peer_id}/avatar")
+async def story_avatar(
+    peer_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> Response:
+    image = await get_story_avatar(account, peer_id)
+    if not image:
+        raise HTTPException(status_code=404, detail="Аватар не найден")
+    return Response(content=image, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.put("/{chat_id}/archive")

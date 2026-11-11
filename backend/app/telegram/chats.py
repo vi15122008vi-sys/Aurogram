@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from telethon.tl.types import Channel, Chat, User
+from telethon import utils
+from telethon.tl.functions.stories import GetAllStoriesRequest
 
 from app.models import ChatOut
 from app.cache.manager import upsert_message
@@ -65,6 +67,36 @@ async def list_chats(
             )
         )
     return out
+
+
+async def list_stories(account: dict) -> list[dict[str, Any]]:
+    client = await get_client(account["id"], account)
+    result = await with_floodwait(lambda: client(GetAllStoriesRequest()))
+    entities = [*getattr(result, "users", []), *getattr(result, "chats", [])]
+    by_peer = {utils.get_peer_id(entity): entity for entity in entities}
+    stories: list[dict[str, Any]] = []
+    for peer_stories in getattr(result, "peer_stories", []):
+        peer_id = utils.get_peer_id(peer_stories.peer)
+        entity = by_peer.get(peer_id)
+        items = getattr(peer_stories, "stories", []) or []
+        if entity is None or not items:
+            continue
+        latest_id = max(int(item.id) for item in items)
+        stories.append({
+            "peer_id": peer_id,
+            "title": _title(entity),
+            "username": getattr(entity, "username", None),
+            "count": len(items),
+            "unread": int(getattr(peer_stories, "max_read_id", 0) or 0) < latest_id,
+            "latest_story_id": latest_id,
+        })
+    return stories
+
+
+async def get_story_avatar(account: dict, peer_id: int) -> bytes | None:
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(peer_id))
+    return await with_floodwait(lambda: client.download_profile_photo(entity))
 
 
 async def get_chat(account: dict, chat_id: int) -> Optional[ChatOut]:

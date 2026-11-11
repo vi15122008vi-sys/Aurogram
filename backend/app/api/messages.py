@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import mimetypes
+import tempfile
+from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.cache.manager import touch_cached_media
+from app.database import fetchone
 from app.deps import get_current_account
 from app.models import MessageOut
 from app.telegram.media import download_message_media, resolve_media_file
-from app.telegram.messages import delete_message, list_messages, send_message
+from app.telegram.messages import delete_message, list_messages, react_to_message, send_message, send_video_note, set_message_pinned
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -22,6 +26,14 @@ class MessageCreate(BaseModel):
     parse_mode: Literal["html", "md"] | None = "html"
 
 
+class ReactionUpdate(BaseModel):
+    emoji: Literal["👍", "❤️", "🔥", "😂"]
+
+
+class PinUpdate(BaseModel):
+    pinned: bool
+
+
 @router.get("", response_model=list[MessageOut])
 async def messages(
     chat_id: int,
@@ -30,6 +42,8 @@ async def messages(
     ghost: bool = True,
     account: dict[str, Any] = Depends(get_current_account),
 ) -> list[MessageOut]:
+    privacy = await fetchone("SELECT no_read_receipts FROM account_preferences WHERE account_id = ?", (account["id"],))
+    ghost = bool(privacy["no_read_receipts"]) if privacy else True
     return await list_messages(
         account,
         chat_id,
@@ -50,6 +64,55 @@ async def create_message(
         payload.text,
         parse_mode=payload.parse_mode,
     )
+
+
+@router.post("/video-note", response_model=MessageOut, status_code=201)
+async def create_video_note(
+    chat_id: int = Form(...),
+    video: UploadFile = File(...),
+    account: dict[str, Any] = Depends(get_current_account),
+) -> MessageOut:
+    if not (video.content_type or "").startswith("video/"):
+        raise HTTPException(status_code=415, detail="Ожидается видеофайл")
+    raw = await video.read(25 * 1024 * 1024 + 1)
+    if len(raw) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Видеосообщение должно быть не больше 25 МБ")
+    with tempfile.TemporaryDirectory(prefix="aurogram-video-note-") as temp_dir:
+        source = Path(temp_dir) / "recording.webm"
+        target = Path(temp_dir) / "video-note.mp4"
+        source.write_bytes(raw)
+        process = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+            "-vf", "scale=512:512:force_original_aspect_ratio=increase,crop=512:512",
+            "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(target),
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+        if process.returncode != 0 or not target.exists():
+            detail = stderr.decode("utf-8", "replace")[-500:] if stderr else "Не удалось обработать видео"
+            raise HTTPException(status_code=422, detail=detail)
+        return await send_video_note(account, chat_id, str(target))
+
+
+@router.put("/{chat_id}/{message_id}/reaction", response_model=MessageOut)
+async def update_reaction(
+    chat_id: int,
+    message_id: int,
+    payload: ReactionUpdate,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> MessageOut:
+    return await react_to_message(account, chat_id, message_id, payload.emoji)
+
+
+@router.put("/{chat_id}/{message_id}/pin", response_model=MessageOut)
+async def update_pin(
+    chat_id: int,
+    message_id: int,
+    payload: PinUpdate,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> MessageOut:
+    return await set_message_pinned(account, chat_id, message_id, payload.pinned)
 
 
 @router.delete("/{chat_id}/{message_id}", status_code=204)

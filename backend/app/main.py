@@ -21,6 +21,7 @@ from app.api.chats import router as chats_router
 from app.api.editor import router as editor_router
 from app.api.health import router as health_router
 from app.api.messages import router as messages_router
+from app.api.privacy import router as privacy_router
 from app.api.notifications import router as notifications_router
 from app.api.textstyles import router as textstyles_router
 from app.api.themes import router as themes_router
@@ -48,7 +49,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             pass
         from app.telegram.client import _clients, drop_client
 
-        for account_id in tuple(_clients):
+        for account_id in {key.split(":", 1)[0] for key in tuple(_clients)}:
             await drop_client(account_id)
 
 
@@ -69,7 +70,7 @@ app.add_middleware(
     ])),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Auth-Token", "X-Admin-Action-Token"],
+    allow_headers=["Authorization", "Content-Type", "X-Auth-Token", "X-Admin-Action-Token", "X-Device-Id"],
 )
 app.add_middleware(
     SessionMiddleware,
@@ -83,6 +84,7 @@ for api_router in (
     accounts_router,
     chats_router,
     messages_router,
+    privacy_router,
     channels_router,
     bots_router,
     editor_router,

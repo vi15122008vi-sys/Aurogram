@@ -65,6 +65,7 @@ async def send_code(
         account=account,
         api_id=payload.api_id,
         api_hash=payload.api_hash,
+        device_id=request.headers.get("x-device-id", "default"),
     )
     _set_auth_cookie(response, request, result.get("token"))
     return _without_token(result)
@@ -86,6 +87,7 @@ async def sign_in(
         code=payload.code,
         password=payload.password,
         account_id=account["id"] if account else None,
+        device_id=request.headers.get("x-device-id", "default"),
     )
     _set_auth_cookie(response, request, result.get("token"))
     return _without_token(result)

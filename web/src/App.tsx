@@ -11,6 +11,7 @@ import { Workspace } from "./screens/Workspace";
 import { ApiError, api, type AuthAccount, type SendCodeResult } from "./lib/api";
 import { applyTheme, themeList, type ThemeId } from "./lib/themes";
 import { useI18n } from "./lib/i18n";
+import { springModal } from "./lib/motion";
 
 type AuthScreen = "phone" | "code" | "twoFactor" | "apiKey";
 
@@ -161,7 +162,7 @@ export default function App() {
 
   return (
     <AnimatePresence mode="wait" initial={false}>
-      <motion.div key={authScreen} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+      <motion.div key={authScreen} initial={{ opacity: 0, y: 14, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: 0.995 }} transition={{ ...springModal, stiffness: 250, damping: 26 }}>
         {authView}
       </motion.div>
     </AnimatePresence>

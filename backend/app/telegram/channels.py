@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import timezone
 from typing import Any, Optional
 
-from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon import utils
+from telethon.tl.functions.channels import GetAdminedPublicChannelsRequest, GetFullChannelRequest
 from telethon.tl.types import Channel
 
 from app.models import ChannelOut
@@ -32,6 +33,27 @@ async def list_channels(account: dict) -> list[ChannelOut]:
                 username=getattr(entity, "username", None),
                 subscribers=getattr(entity, "participants_count", 0) or 0,
                 last_post_at=last_at,
+            )
+        )
+    return out
+
+
+async def list_admined_public_channels(account: dict) -> list[ChannelOut]:
+    """Return public channels Telegram reports as administered by this account."""
+    client = await get_client(account["id"], account)
+    result = await with_floodwait(
+        lambda: client(GetAdminedPublicChannelsRequest(by_location=False, check_limit=False))
+    )
+    out: list[ChannelOut] = []
+    for entity in getattr(result, "chats", []):
+        if not isinstance(entity, Channel) or not getattr(entity, "broadcast", False):
+            continue
+        out.append(
+            ChannelOut(
+                id=utils.get_peer_id(entity),
+                title=entity.title or str(entity.id),
+                username=getattr(entity, "username", None),
+                subscribers=getattr(entity, "participants_count", 0) or 0,
             )
         )
     return out

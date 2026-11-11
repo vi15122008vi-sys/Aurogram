@@ -1,5 +1,7 @@
 import { Bot, MessageCircle, Radio, Settings } from "lucide-react";
+import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
+import { springPress } from "../lib/motion";
 
 export type AppTab = "channels" | "bots" | "chats" | "settings";
 
@@ -23,18 +25,19 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
         {items.map(({ id, label, icon: Icon }) => {
           const selected = active === id;
           return (
-            <button
+            <motion.button
               key={id}
               type="button"
               aria-current={selected ? "page" : undefined}
               aria-label={t(label)}
               onClick={() => onChange(id)}
+              whileTap={springPress}
               className={`glass-hover relative mx-1 my-1 flex h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-medium transition duration-200 ${selected ? "bg-accent/10 text-accent" : "text-muted hover:bg-surfaceRaised/70 hover:text-ink"}`}
             >
               <Icon size={18} strokeWidth={1.5} />
               <span>{t(label)}</span>
               {selected && <span className="absolute inset-x-5 -top-1 h-px rounded-full bg-accent shadow-[0_0_8px_var(--accent)]" aria-hidden="true" />}
-            </button>
+            </motion.button>
           );
         })}
       </div>

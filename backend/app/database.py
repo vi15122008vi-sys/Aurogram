@@ -23,6 +23,21 @@ CREATE TABLE IF NOT EXISTS accounts (
     meta_json TEXT DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS account_devices (
+    account_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (account_id, device_id)
+);
+
+CREATE TABLE IF NOT EXISTS account_preferences (
+    account_id TEXT PRIMARY KEY,
+    hide_online INTEGER NOT NULL DEFAULT 0,
+    no_read_receipts INTEGER NOT NULL DEFAULT 1,
+    hide_device_type INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS channel_settings (
     account_id TEXT NOT NULL,
     channel_id INTEGER NOT NULL,
@@ -35,6 +50,21 @@ CREATE TABLE IF NOT EXISTS archived_chats (
     account_id TEXT NOT NULL,
     chat_id INTEGER NOT NULL,
     archived_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (account_id, chat_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_folders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE (account_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS chat_folder_chats (
+    account_id TEXT NOT NULL,
+    folder_id INTEGER NOT NULL,
+    chat_id INTEGER NOT NULL,
     PRIMARY KEY (account_id, chat_id)
 );
 
@@ -131,6 +161,10 @@ async def init_db() -> None:
     conn = await connect()
     try:
         await conn.executescript(SCHEMA)
+        await conn.execute(
+            "INSERT OR IGNORE INTO account_devices (account_id, device_id) "
+            "SELECT id, 'default' FROM accounts WHERE auth_state = 'ok'"
+        )
         await conn.commit()
     finally:
         await conn.close()

@@ -1,4 +1,4 @@
-export type ThemeId = "aurogram" | "paper" | "mint" | "sky" | "ghost" | "midnight" | "ocean" | "sunset";
+export type ThemeId = "aurogram" | "paper" | "mint" | "sky" | "ghost" | "midnight" | "ocean" | "sunset" | "orange" | "halloween";
 
 export interface ThemeColors {
   canvas: string;
@@ -87,6 +87,22 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
       canvas: "#10080C", surface: "#1A1015", raised: "#24151C", ink: "#FFF7F8", muted: "#C0A8AE",
       line: "rgba(255,255,255,0.07)", accent: "#F43F5E", accentStrong: "#FB7185", success: "#22C55E",
       warning: "#F59E0B", danger: "#EF4444", ghost: "#C4B5FD",
+    },
+  },
+  orange: {
+    id: "orange", name: "Orange", dark: true,
+    colors: {
+      canvas: "#160D08", surface: "#21130B", raised: "#2D1A0E", ink: "#FFF7ED", muted: "#C4A58D",
+      line: "rgba(255,255,255,0.08)", accent: "#F97316", accentStrong: "#FB923C", success: "#22C55E",
+      warning: "#FBBF24", danger: "#EF4444", ghost: "#C084FC",
+    },
+  },
+  halloween: {
+    id: "halloween", name: "Halloween", dark: true,
+    colors: {
+      canvas: "#1A0B0B", surface: "#251111", raised: "#321818", ink: "#FFF7F2", muted: "#C4A8A3",
+      line: "rgba(255,255,255,0.08)", accent: "#F97316", accentStrong: "#FB923C", success: "#22C55E",
+      warning: "#FBBF24", danger: "#EF4444", ghost: "#A78BFA",
     },
   },
 };

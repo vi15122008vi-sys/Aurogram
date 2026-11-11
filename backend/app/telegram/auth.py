@@ -255,10 +255,16 @@ async def send_code(
     account: Optional[dict] = None,
     api_id: Optional[int] = None,
     api_hash: Optional[str] = None,
+    device_id: str = "default",
 ) -> dict[str, Any]:
     settings = get_settings()
+    reused_existing_account = False
+    if account is None:
+        existing = await fetchone("SELECT * FROM accounts WHERE phone = ? AND auth_state = 'ok' ORDER BY created_at LIMIT 1", (phone,))
+        if existing:
+            account = dict(existing)
+            reused_existing_account = True
     account_id = account["id"] if account else str(uuid.uuid4())
-
     if settings.allow_per_account_keys and api_id and api_hash and not account:
         creds = (api_id, api_hash)
     elif account:
@@ -266,7 +272,9 @@ async def send_code(
     else:
         creds = resolve_api_credentials(None)
 
-    client = make_ephemeral_client(account_id, creds[0], creds[1])
+    preferences = await fetchone("SELECT hide_device_type FROM account_preferences WHERE account_id = ?", (account_id,))
+    hide_device_type = bool(preferences["hide_device_type"]) if preferences else False
+    client = make_ephemeral_client(account_id, creds[0], creds[1], device_id, hide_device_type)
     await client.connect()
     try:
         kwargs: dict[str, Any] = {}
@@ -288,13 +296,10 @@ async def send_code(
                 (account_id, phone, api_id_enc, api_hash_enc, token),
             )
         else:
-            await execute(
-                "UPDATE accounts SET phone = ?, auth_state = 'pending' WHERE id = ?",
-                (phone, account_id),
-            )
-            token = account["token"]
+            await execute("UPDATE accounts SET phone = ? WHERE id = ?", (phone, account_id))
+            token = None if reused_existing_account else account["token"]
 
-        secure_session_file(session_path(account_id))
+        secure_session_file(session_path(account_id, device_id))
         return {
             "account_id": account_id,
             "phone": phone,
@@ -324,6 +329,7 @@ async def sign_in(
     code: str,
     password: Optional[str] = None,
     account_id: Optional[str] = None,
+    device_id: str = "default",
 ) -> dict[str, Any]:
     row = None
     if account_id:
@@ -334,7 +340,7 @@ async def sign_in(
         raise HTTPException(400, "Сначала запросите код")
 
     account = dict(row)
-    client = await get_client(account["id"], account)
+    client = await get_client(account["id"], account, device_id)
     try:
         try:
             me = await with_floodwait(
@@ -390,7 +396,9 @@ async def sign_in(
             """,
             (name or phone, username, phone, account["id"]),
         )
-        secure_session_file(session_path(account["id"]))
+        safe_device_id = "".join(c for c in device_id if c.isalnum() or c in "-_")[:80] or "default"
+        await execute("INSERT OR IGNORE INTO account_devices (account_id, device_id) VALUES (?, ?)", (account["id"], safe_device_id))
+        secure_session_file(session_path(account["id"], device_id))
         return {
             "need_password": False,
             "account_id": account["id"],
@@ -435,7 +443,9 @@ async def start_qr(account: Optional[dict] = None) -> dict[str, Any]:
             (account_id, token),
         )
 
-    client = make_ephemeral_client(account_id, api_id, api_hash)
+    preferences = await fetchone("SELECT hide_device_type FROM account_preferences WHERE account_id = ?", (account_id,))
+    hide_device_type = bool(preferences["hide_device_type"]) if preferences else False
+    client = make_ephemeral_client(account_id, api_id, api_hash, hide_device_type=hide_device_type)
     await client.connect()
     qr = await client.qr_login()
     # Keep client in memory briefly via get_client path

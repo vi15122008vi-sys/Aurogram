@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Bell, Database, EyeOff, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { Bell, Database, EyeOff, LogOut, ShieldCheck, Smartphone, UserRound } from "lucide-react";
+import { api, type PrivacyPreferences } from "../lib/api";
 import { ThemePicker } from "../components/ThemePicker";
 import { Toggle } from "../components/Toggle";
 import { applyTheme, themeList, type ThemeId } from "../lib/themes";
@@ -14,7 +15,9 @@ interface SettingsProps {
 
 export function Settings({ accountName, phone, onLogout }: SettingsProps) {
   const { locale, setLocale, t } = useI18n();
-  const [ghostMode, setGhostMode] = useState(false);
+  const [privacy, setPrivacy] = useState<PrivacyPreferences>({ hide_online: false, no_read_receipts: true, hide_device_type: false });
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [quietHours, setQuietHours] = useState(false);
   const [cacheLimit, setCacheLimit] = useState(20);
@@ -28,6 +31,29 @@ export function Settings({ accountName, phone, onLogout }: SettingsProps) {
       applyTheme(stored);
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    api.privacy.get().then((current) => { if (active) setPrivacy(current); }).catch((cause: unknown) => {
+      if (active) setPrivacyError(cause instanceof Error ? cause.message : t("Не удалось загрузить настройки приватности"));
+    });
+    return () => { active = false; };
+  }, []);
+
+  async function updatePrivacy(key: keyof PrivacyPreferences, value: boolean) {
+    setPrivacyBusy(true);
+    setPrivacyError(null);
+    const previous = privacy;
+    setPrivacy({ ...previous, [key]: value });
+    try {
+      setPrivacy(await api.privacy.update({ [key]: value }));
+    } catch (cause) {
+      setPrivacy(previous);
+      setPrivacyError(cause instanceof Error ? cause.message : t("Не удалось сохранить настройки приватности"));
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
 
   function changeTheme(id: ThemeId) {
     setTheme(id);
@@ -50,10 +76,14 @@ export function Settings({ accountName, phone, onLogout }: SettingsProps) {
         </section>
 
         <section>
-          <SectionHeading>{t("GHOST")}</SectionHeading>
+          <SectionHeading>{t("ПРИВАТНОСТЬ")}</SectionHeading>
+          <h2 className="mb-2 text-lg font-semibold text-ink">{t("Приватность")}</h2>
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface/90">
-            <SettingRow icon={<EyeOff size={16} />} title={t("Ghost-режим")} description={t("Не отправлять отметку о прочтении")} control={<Toggle label={t("Ghost-режим")} checked={ghostMode} onChange={setGhostMode} />} />
+            <SettingRow icon={<EyeOff size={16} />} title={t("Скрывать онлайн")} description={t("Ограничить видимость времени активности в Telegram")} control={<Toggle label={t("Скрывать онлайн")} checked={privacy.hide_online} disabled={privacyBusy} onChange={(value) => void updatePrivacy("hide_online", value)} />} />
+            <SettingRow icon={<EyeOff size={16} />} title={t("Не отправлять прочитано")} description={t("Не подтверждать просмотр входящих сообщений")} control={<Toggle label={t("Не отправлять прочитано")} checked={privacy.no_read_receipts} disabled={privacyBusy} onChange={(value) => void updatePrivacy("no_read_receipts", value)} />} />
+            <SettingRow icon={<Smartphone size={16} />} title={t("Скрывать тип устройства")} description={t("Использовать нейтральные данные клиента при подключении")} control={<Toggle label={t("Скрывать тип устройства")} checked={privacy.hide_device_type} disabled={privacyBusy} onChange={(value) => void updatePrivacy("hide_device_type", value)} />} />
           </div>
+          {privacyError && <p role="alert" className="mt-2 text-xs text-danger">{privacyError}</p>}
         </section>
 
         <section>

@@ -135,17 +135,17 @@ async def _on_new_message(account: dict, event: Any) -> None:
             log.warning("push notification failed account %s: %s", account["id"][:8], e)
 
 
-async def _run_account(account: dict) -> None:
+async def _run_account(account: dict, device_id: str) -> None:
     global _status, _errors_24h
     try:
-        client = await get_client(account["id"], account)
+        client = await get_client(account["id"], account, device_id)
         await _catch_up(account, client)
 
         @client.on(events.NewMessage)
         async def handler(event: Any) -> None:  # noqa: ANN401
             await _on_new_message(account, event)
 
-        log.info("account %s: listening", account["id"][:8])
+        log.info("account %s device %s: listening", account["id"][:8], device_id[:8])
         await client.run_until_disconnected()
     except AuthKeyUnregisteredError:
         log.error("account %s: session invalidated", account["id"][:8])
@@ -192,16 +192,17 @@ async def main() -> None:
     running: dict[str, asyncio.Task] = {}
     try:
         while True:
-            rows = await fetchall("SELECT * FROM accounts WHERE auth_state = 'ok'")
-            alive_ids = {r["id"] for r in rows}
-            for aid, task in list(running.items()):
-                if aid not in alive_ids or task.done():
+            rows = await fetchall("SELECT accounts.*, account_devices.device_id FROM accounts JOIN account_devices ON account_devices.account_id = accounts.id WHERE accounts.auth_state = 'ok'")
+            alive_ids = {f"{r['id']}:{r['device_id']}" for r in rows}
+            for session_key, task in list(running.items()):
+                if session_key not in alive_ids or task.done():
                     task.cancel()
-                    running.pop(aid, None)
+                    running.pop(session_key, None)
             for row in rows:
-                aid = row["id"]
-                if aid not in running:
-                    running[aid] = asyncio.create_task(_run_account(dict(row)), name=f"account-{aid}")
+                device_id = row["device_id"]
+                session_key = f"{row['id']}:{device_id}"
+                if session_key not in running:
+                    running[session_key] = asyncio.create_task(_run_account(dict(row), device_id), name=f"session-{session_key}")
             global _status
             _status = "ok"
             await asyncio.sleep(15)

@@ -108,6 +108,7 @@ class MessageOut(BaseModel):
     duration: Optional[int] = None
     waveform_data: Optional[List[int]] = None
     reactions: List[Dict[str, Any]] = Field(default_factory=list)
+    pinned: bool = False
 
 
 class MemberOut(BaseModel):

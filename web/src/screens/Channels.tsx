@@ -11,6 +11,7 @@ interface ChannelsProps {
 
 export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
   const { t } = useI18n();
+  const [listView, setListView] = useState<"channels" | "mine">("channels");
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -21,7 +22,7 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
     let active = true;
     setLoading(true);
     setError(null);
-    api.channels.list()
+    (listView === "mine" ? api.channels.admined() : api.channels.list())
       .then((result) => {
         if (active) setChannels(result);
       })
@@ -34,7 +35,7 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
     return () => {
       active = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, listView]);
 
   const filteredChannels = channels.filter((channel) => `${channel.title} ${channel.username ?? ""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
 
@@ -55,6 +56,13 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
         >
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
+      </div>
+      <div className="mt-5 inline-flex rounded-xl border border-line bg-surface/70 p-1" role="tablist" aria-label={t("Раздел каналов")}>
+        {([ ["channels", "Каналы"], ["mine", "Мои каналы"] ] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={listView === id} onClick={() => setListView(id)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${listView === id ? "bg-accent/15 text-accent" : "text-muted hover:text-ink"}`}>
+            {t(label)}
+          </button>
+        ))}
       </div>
       <label className="mt-5 flex h-9 max-w-lg items-center gap-2 rounded-lg border border-line bg-surface px-3 text-muted">
         <Search size={15} />
@@ -86,7 +94,7 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
           <div className="max-w-xs">
             <span className="mx-auto grid size-12 place-items-center rounded-xl bg-raised text-muted"><Radio size={21} strokeWidth={1.5} /></span>
             <h2 className="mt-4 text-base font-semibold">{loading ? t("Загружаем каналы…") : query ? t("Совпадений нет") : t("Каналов пока нет")}</h2>
-            {!loading && !error && !query && <p className="mt-2 text-sm leading-6 text-muted">{t("Здесь появятся каналы, где у аккаунта есть права администратора.")}</p>}
+            {!loading && !error && !query && <p className="mt-2 text-sm leading-6 text-muted">{t(listView === "mine" ? "Здесь появятся публичные каналы, которыми вы управляете." : "Здесь появятся каналы, где у аккаунта есть права администратора.")}</p>}
           </div>
         </div>
       )}

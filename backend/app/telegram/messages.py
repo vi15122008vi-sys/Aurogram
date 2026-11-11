@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import timezone
 from typing import Any, Optional
 
+from telethon.tl.functions.messages import SendReactionRequest
+from telethon.tl.types import ReactionEmoji
+
 from app.models import MessageOut
 from app.telegram.client import get_client
 from app.telegram.floodwait import with_floodwait
@@ -17,14 +20,18 @@ def _status(msg: Any) -> str:
 def _media_type(msg: Any) -> Optional[str]:
     if not msg.media:
         return None
+    if getattr(msg, "video_note", False):
+        return "video_note"
     name = type(msg.media).__name__.lower()
     if "photo" in name:
         return "photo"
     if "document" in name:
         attrs = getattr(msg.media, "document", None)
         mime = getattr(attrs, "mime_type", "") if attrs else ""
+        if getattr(msg, "voice", None) or "ogg" in mime or "opus" in mime:
+            return "voice"
         if mime.startswith("audio/") or "voice" in name:
-            return "voice" if getattr(msg, "voice", False) or "ogg" in mime else "audio"
+            return "audio"
         if mime.startswith("video/"):
             return "video"
         return "document"
@@ -49,6 +56,13 @@ def to_out(msg: Any, chat_id: int) -> MessageOut:
     date = msg.date
     if date and date.tzinfo is None:
         date = date.replace(tzinfo=timezone.utc)
+    reactions = []
+    for item in getattr(getattr(msg, "reactions", None), "results", []) or []:
+        reaction = getattr(item, "reaction", None)
+        emoji = getattr(reaction, "emoticon", None)
+        if emoji:
+            reactions.append({"emoji": emoji, "count": int(getattr(item, "count", 0)), "chosen": bool(getattr(item, "chosen", False))})
+    media = getattr(msg, "video", None) or getattr(msg, "voice", None)
     return MessageOut(
         id=msg.id,
         chat_id=chat_id,
@@ -60,8 +74,10 @@ def to_out(msg: Any, chat_id: int) -> MessageOut:
         status=_status(msg),  # type: ignore[arg-type]
         edited=bool(getattr(msg, "edit_date", None)),
         media_type=_media_type(msg),
-        duration=getattr(msg, "voice", None) and getattr(msg.voice, "duration", None),
+        duration=getattr(media, "duration", None) if media else None,
         waveform_data=_waveform(msg),
+        reactions=reactions,
+        pinned=bool(getattr(msg, "pinned", False)),
     )
 
 
@@ -77,6 +93,8 @@ async def list_messages(
     messages = await with_floodwait(
         lambda: client.get_messages(chat_id, limit=limit, offset_id=offset_id or None)
     )
+    if not ghost and messages:
+        await with_floodwait(lambda: client.send_read_acknowledge(chat_id, max_id=messages[0].id))
     return [to_out(m, chat_id) for m in messages if m]
 
 
@@ -96,3 +114,31 @@ async def send_message(
 async def delete_message(account: dict, chat_id: int, message_id: int) -> None:
     client = await get_client(account["id"], account)
     await with_floodwait(lambda: client.delete_messages(chat_id, [message_id]))
+
+
+async def react_to_message(account: dict, chat_id: int, message_id: int, emoji: str) -> MessageOut:
+    client = await get_client(account["id"], account)
+    peer = await client.get_input_entity(chat_id)
+    await with_floodwait(lambda: client(SendReactionRequest(peer, message_id, [ReactionEmoji(emoticon=emoji)])))
+    message = await with_floodwait(lambda: client.get_messages(chat_id, ids=message_id))
+    if not message:
+        raise ValueError("Сообщение не найдено после отправки реакции")
+    return to_out(message, chat_id)
+
+
+async def send_video_note(account: dict, chat_id: int, video_path: str) -> MessageOut:
+    client = await get_client(account["id"], account)
+    message = await with_floodwait(lambda: client.send_file(chat_id, video_path, video_note=True, supports_streaming=True))
+    return to_out(message, chat_id)
+
+
+async def set_message_pinned(account: dict, chat_id: int, message_id: int, pinned: bool) -> MessageOut:
+    client = await get_client(account["id"], account)
+    if pinned:
+        await with_floodwait(lambda: client.pin_message(chat_id, message_id, notify=False))
+    else:
+        await with_floodwait(lambda: client.unpin_message(chat_id, message_id, notify=False))
+    message = await with_floodwait(lambda: client.get_messages(chat_id, ids=message_id))
+    if not message:
+        raise ValueError("Сообщение не найдено")
+    return to_out(message, chat_id)
