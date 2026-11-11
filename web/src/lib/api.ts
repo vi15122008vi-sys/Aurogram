@@ -194,6 +194,10 @@ export function storyAvatarUrl(peerId: number): string {
   return apiUrl(`/chats/stories/${peerId}/avatar`);
 }
 
+export function chatAvatarUrl(chatId: number): string {
+  return apiUrl(`/chats/${chatId}/avatar`);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   let deviceId = localStorage.getItem("aurogram.device_id");

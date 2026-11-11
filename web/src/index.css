@@ -167,6 +167,8 @@
   box-sizing: border-box;
 }
 
+svg.lucide { stroke-width: 1.5 !important; }
+
 html {
   min-width: 320px;
   min-height: 100%;

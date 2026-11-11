@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, ChartNoAxesColumn, Radio, RefreshCw, Search, Send, Users } from "lucide-react";
 import { api, type ChannelRecord } from "../lib/api";
+import { Avatar } from "../components/Avatar";
 import { useI18n } from "../lib/i18n";
 
 interface ChannelsProps {
@@ -74,7 +75,7 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
           {filteredChannels.map((channel) => (
             <article key={channel.id} className="group/card rounded-xl border border-border bg-surface/90 p-3.5 transition duration-200 hover:-translate-y-0.5 hover:border-accent/25 hover:bg-surface hover:shadow-[0_12px_36px_rgb(0_0_0_/_18%)]">
               <button type="button" onClick={() => onOpen(channel)} className="group flex w-full items-center gap-3 text-left">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/15 bg-accent/10 text-sm font-semibold text-accent transition group-hover/card:border-accent/30">{channel.title.slice(0, 1).toLocaleUpperCase()}</span>
+                <Avatar name={channel.title} id={channel.id} className="size-10 border border-white/10" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2"><span className="truncate text-sm font-semibold text-ink">{channel.title}</span>{(channel.scheduled_count ?? 0) > 0 && <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent"><span className="size-1.5 rounded-full bg-accent" />{channel.scheduled_count} {t("отложено")}</span>}</span>
                   <span className="mt-1 block truncate text-xs text-muted">{channel.username ? `@${channel.username}` : `ID ${channel.id}`}</span>

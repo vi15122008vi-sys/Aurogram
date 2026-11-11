@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, FolderPlus, LoaderCircle, MessageCircle, MoreHorizontal, Search } from "lucide-react";
-import { api, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
+import { Archive, ArchiveRestore, FolderPlus, LoaderCircle, MoreHorizontal, Search } from "lucide-react";
+import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
+import { Avatar } from "../components/Avatar";
 import { useI18n } from "../lib/i18n";
 
 export type ChatFilter = "all" | "user" | "group" | "channel" | "archive";
@@ -136,10 +137,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
           {stories.length ? stories.map((story) => (
             <div key={story.peer_id} className="flex w-[58px] shrink-0 flex-col items-center gap-1.5">
               <span className={`size-[54px] rounded-full p-[2px] ${story.unread ? "bg-gradient-to-br from-fuchsia-500 via-accent to-amber-400" : "bg-line"}`}>
-                <span className="relative grid size-full place-items-center overflow-hidden rounded-full border-2 border-canvas bg-raised text-sm font-semibold text-accent">
-                  {story.title.trim().slice(0, 1).toLocaleUpperCase(locale === "ru" ? "ru-RU" : "en-US")}
-                  <img src={storyAvatarUrl(story.peer_id)} alt="" loading="lazy" className="absolute inset-0 size-full rounded-full object-cover" onError={(event) => { event.currentTarget.style.display = "none"; }} />
-                </span>
+                <Avatar name={story.title} id={story.peer_id} src={storyAvatarUrl(story.peer_id)} className="size-full border-2 border-canvas" />
               </span>
               <span className="w-full truncate text-center text-[10px] text-muted">{story.title}</span>
             </div>
@@ -185,9 +183,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
         {visibleChats.map((chat) => (
           <article key={chat.id} className="chat-row group relative flex items-center gap-2 border-b border-white/[0.055] px-2.5 py-2 last:border-0 sm:px-3">
             <button type="button" onClick={() => onOpen?.(chat)} className="glass-hover flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left transition duration-200">
-              <span className="grid size-11 shrink-0 place-items-center rounded-[14px] border border-white/[0.08] bg-gradient-to-br from-accent/20 to-violet-500/10 text-sm font-semibold text-accent shadow-[inset_0_1px_0_rgb(255_255_255_/_6%)]">
-                {chat.title.trim().slice(0, 1).toLocaleUpperCase(locale === "ru" ? "ru-RU" : "en-US") || <MessageCircle size={17} strokeWidth={1.5} />}
-              </span>
+              <Avatar name={chat.title} id={chat.id} src={chatAvatarUrl(chat.id)} className="size-11 border border-white/10 shadow-[0_3px_12px_rgb(0_0_0_/_16%)]" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
                   <span className="block truncate text-sm font-semibold text-ink">{chat.title}</span>

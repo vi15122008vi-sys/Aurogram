@@ -1,4 +1,4 @@
-import { Bot, MessageCircle, Radio, Settings } from "lucide-react";
+import { Bot, MessagesSquare, RadioTower, SlidersHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { springPress } from "../lib/motion";
@@ -11,10 +11,10 @@ interface BottomNavProps {
 }
 
 const items = [
-  { id: "channels", label: "Каналы", icon: Radio },
+  { id: "channels", label: "Каналы", icon: RadioTower },
   { id: "bots", label: "Боты", icon: Bot },
-  { id: "chats", label: "Чаты", icon: MessageCircle },
-  { id: "settings", label: "Настройки", icon: Settings },
+  { id: "chats", label: "Чаты", icon: MessagesSquare },
+  { id: "settings", label: "Настройки", icon: SlidersHorizontal },
 ] as const;
 
 export function BottomNav({ active, onChange }: BottomNavProps) {

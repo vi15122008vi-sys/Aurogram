@@ -120,6 +120,17 @@ async def story_avatar(
     return Response(content=image, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
 
 
+@router.get("/{chat_id}/avatar")
+async def chat_avatar(
+    chat_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> Response:
+    image = await get_story_avatar(account, chat_id)
+    if not image:
+        raise HTTPException(status_code=404, detail="Аватар не найден")
+    return Response(content=image, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
+
+
 @router.put("/{chat_id}/archive")
 async def update_chat_archive(
     chat_id: int,
