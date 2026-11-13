@@ -38,7 +38,10 @@ export function Avatar({ name, id, src, className = "size-10" }: AvatarProps) {
       role="img"
       aria-label={name || String(id ?? "")}
       className={`relative inline-grid aspect-square shrink-0 place-items-center overflow-hidden rounded-full text-sm font-semibold text-white ${className}`}
-      style={{ backgroundImage: `linear-gradient(135deg, ${start}, ${end})` }}
+      style={{
+        backgroundImage: `linear-gradient(135deg, ${start}, ${end})`,
+        boxShadow: `inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 -12px 24px rgb(0 0 0 / 0.18), 0 6px 16px ${start}33`,
+      }}
     >
       {src && !imageFailed && <img src={src} alt="" loading="lazy" className="absolute inset-0 size-full rounded-full object-cover" onError={() => setImageFailed(true)} />}
       {(!src || imageFailed) && <span className="drop-shadow-[0_1px_2px_rgb(0_0_0_/_25%)]">{initials(name, id)}</span>}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Plug, ShieldCheck, Wrench, X } from "lucide-react";
 import { ChannelStudio } from "../screens/ChannelStudio";
 import { IntegrationsPanel } from "../screens/IntegrationsPanel";
@@ -33,11 +34,14 @@ export function StudioModal({ open, onClose, channelId, channelTitle, initialSec
   if (!open) return null;
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-label={t("Студия канала", "Channel studio")}
       className="fixed inset-0 z-50 overflow-y-auto bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] backdrop-blur-[24px]"
+      initial={{ opacity: 0, scale: 0.985 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.24, ease: [0.22, 0.61, 0.36, 1] }}
       onClick={onClose}
     >
       <div className="mx-auto min-h-full w-full max-w-5xl px-3 pb-10 pt-3 sm:px-5" onClick={(event) => event.stopPropagation()}>
@@ -78,6 +82,6 @@ export function StudioModal({ open, onClose, channelId, channelTitle, initialSec
           {mode === "antispam" && <AntispamScreen channelId={channelId} />}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

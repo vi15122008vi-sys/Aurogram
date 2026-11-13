@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { ArrowLeft, CalendarClock, ChartNoAxesColumn, MessageSquareText, Radio, Settings2, Users, Wrench } from "lucide-react";
 import { api, type ChannelDetails, type ChannelRecord } from "../lib/api";
 import { StudioModal } from "../components/StudioModal";
@@ -159,7 +160,7 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
       </div>
 
       {error && <p role="alert" className="mt-4 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-      <div className="mt-5">
+      <motion.div key={active} className="mt-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, ease: [0.22, 0.61, 0.36, 1] }}>
         {active === "posts" && <div className="space-y-5"><PostEditor channelId={channel.id} focusSchedule={initialSchedule} onPublished={() => setPostsReloadKey((key) => key + 1)} /><div><h2 className="mb-3 text-sm font-semibold">{t("Последние публикации")}</h2><MessageList key={`${channel.id}:${postsReloadKey}`} chatId={channel.id} pageSize={20} /></div></div>}
         {active === "stats" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label={t("Подписчики")} value={subscribers.toLocaleString(locale === "ru" ? "ru-RU" : "en-US")} />
@@ -194,7 +195,8 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
           <Info label={t("Описание")} value={details?.about || t("Нет описания")} />
           <Info label={t("Чат обсуждений")} value={details?.linked_chat_id ? String(details.linked_chat_id) : t("Не привязан")} mono />
         </dl>}
-      </div>
+      </motion.div>
+
       <StudioModal
         open={studioOpen}
         onClose={() => setStudioOpen(false)}
