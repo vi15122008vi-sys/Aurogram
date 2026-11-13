@@ -3,6 +3,7 @@ import {
   Bell, Database, Gauge, Languages, LogOut, Palette, ShieldCheck, Sparkles, UserRound, Zap,
 } from "lucide-react";
 import { api, type AiReplyStyle, type CardStyle, type Density, type PrivacyPreferences, type UiSettings } from "../lib/api";
+import { GlassButton } from "../components/Buttons";
 import { ThemePicker } from "../components/ThemePicker";
 import { Toggle } from "../components/Toggle";
 import { applyTheme, themeList, type ThemeId } from "../lib/themes";
@@ -327,13 +328,13 @@ export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) 
           icon={<Database size={17} />}
         >
           <p className="font-mono text-lg tabular-nums text-ink">{cacheReset ? t("по умолчанию") : `${cacheLimit} ${t("ГБ")}`}</p>
-          <button
-            type="button"
+          <GlassButton
+            tone="glass"
             onClick={() => { setCacheLimit(20); setCacheReset(true); }}
-            className="mt-2 inline-flex h-8 items-center rounded-full bg-surface/60 px-3 text-[11px] text-muted transition hover:text-accent"
+            className="mt-2 h-8 px-3 text-[11px] font-medium"
           >
             {t("Сбросить кэш")}
-          </button>
+          </GlassButton>
         </BentoCard>
 
         <BentoCard

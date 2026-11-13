@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Braces, ImagePlus, Loader2, Save, Sparkles, Users } from "lucide-react";
 import { api } from "../../lib/api";
+import { GlassButton } from "../../components/Buttons";
 import { useI18n } from "../../lib/i18n";
 
 interface WelcomeEditorProps {
@@ -147,14 +148,14 @@ export function WelcomeEditor({ channelId }: WelcomeEditorProps) {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface/60 px-3.5 text-[11px] font-medium text-ink transition hover:text-accent">
+        <GlassButton tone="glass" onClick={() => inputRef.current?.click()} className="h-9 px-3.5 text-[11px] font-medium">
           <ImagePlus size={13} />{photoName ? photoName : hasPhoto ? t("Заменить фото") : t("Добавить фото")}
-        </button>
+        </GlassButton>
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(event) => pickPhoto(event.target.files?.[0])} />
         {photoData && <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 font-mono text-[10px] text-success"><Sparkles size={10} />{t("готово к загрузке")}</span>}
-        <button type="button" onClick={() => void save()} disabled={busy} className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[11px] font-semibold text-white transition hover:bg-accent-strong disabled:opacity-50">
+        <GlassButton tone="accent" onClick={() => void save()} disabled={busy} className="ml-auto h-9 px-3.5 text-[11px] font-semibold">
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}{t("Сохранить")}
-        </button>
+        </GlassButton>
       </div>
 
       {error && <p role="alert" className="rounded-[14px] bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}

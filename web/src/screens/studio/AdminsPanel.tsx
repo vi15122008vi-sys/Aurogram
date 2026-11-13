@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import { api } from "../../lib/api";
+import { GlassButton } from "../../components/Buttons";
 import { useI18n } from "../../lib/i18n";
 
 interface AdminRow {
@@ -87,9 +88,9 @@ export function AdminsPanel({ channelId }: AdminsPanelProps) {
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{rows.length} {t("человек", "people")}</p>
           </div>
         </div>
-        <button type="button" onClick={() => setInviteOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[11px] font-semibold text-white transition hover:bg-accent-strong">
+        <GlassButton tone="accent" onClick={() => setInviteOpen(true)} className="h-9 px-3.5 text-[11px] font-semibold">
           <Plus size={13} />{t("Пригласить")}
-        </button>
+        </GlassButton>
       </div>
 
       {loading && <p className="mt-3 flex items-center gap-2 text-xs text-muted"><Loader2 size={13} className="animate-spin" />{t("Загружаем…")}</p>}
@@ -107,9 +108,9 @@ export function AdminsPanel({ channelId }: AdminsPanelProps) {
               <p className="truncate font-mono text-[10px] text-muted">{row.username ? `@${row.username}` : row.user_id} · {row.role}</p>
             </div>
             {row.role !== "Владелец" && !row.is_self && (
-              <button type="button" onClick={() => void remove(row.user_id)} disabled={busy} aria-label={t("Удалить админа")} className="grid size-8 place-items-center rounded-full bg-danger/10 text-danger transition hover:bg-danger/20 disabled:opacity-40">
+              <GlassButton tone="danger" onClick={() => void remove(row.user_id)} disabled={busy} aria-label={t("Удалить админа")} className="size-8 p-0">
                 <Trash2 size={13} />
-              </button>
+              </GlassButton>
             )}
           </div>
         ))}
@@ -131,9 +132,9 @@ export function AdminsPanel({ channelId }: AdminsPanelProps) {
                 placeholder="@username"
                 className="h-10 min-w-0 flex-1 rounded-[14px] bg-surface/60 px-3 font-mono text-sm text-ink outline-none placeholder:text-muted"
               />
-              <button type="submit" disabled={busy || username.trim().length < 2} className="inline-flex h-10 items-center rounded-[14px] bg-accent px-4 text-xs font-semibold text-white disabled:opacity-50">
+              <GlassButton type="submit" tone="accent" disabled={busy || username.trim().length < 2} className="h-10 rounded-[14px] px-4 text-xs font-semibold">
                 {busy ? <Loader2 size={14} className="animate-spin" /> : t("Добавить")}
-              </button>
+              </GlassButton>
             </form>
             <p className="mt-2 text-[10px] leading-4 text-muted">{t("Пользователь должен быть доступен по username. Права выдаются после вступления в канал.", "The user must be reachable by username.")}</p>
           </div>
