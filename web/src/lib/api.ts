@@ -202,6 +202,18 @@ export interface ProfileStats {
   media: number;
 }
 
+export type Density = "compact" | "comfortable" | "spacious";
+export type CardStyle = "glass" | "flat" | "neo";
+export type AiReplyStyle = "strict" | "friendly" | "brief";
+
+export interface UiSettings {
+  density: Density;
+  card_style: CardStyle;
+  ai_translate: boolean;
+  ai_reply_style: AiReplyStyle;
+  energy_save: boolean;
+}
+
 export interface MyProfile {
   account: {
     id: string;
@@ -524,6 +536,11 @@ export const api = {
       form.append("caption", caption);
       return request<MessageRecord>(`/editor/channels/${channelId}/photos`, { method: "POST", body: form });
     },
+  },
+  settings: {
+    get: () => request<UiSettings>("/settings"),
+    patch: (payload: Partial<UiSettings>) =>
+      request<UiSettings>("/settings", { method: "PATCH", body: json(payload) }),
   },
   users: {
     me: () => request<MyProfile>("/users/me"),

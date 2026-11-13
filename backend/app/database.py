@@ -57,6 +57,11 @@ CREATE TABLE IF NOT EXISTS account_preferences (
     hide_online INTEGER NOT NULL DEFAULT 0,
     no_read_receipts INTEGER NOT NULL DEFAULT 1,
     hide_device_type INTEGER NOT NULL DEFAULT 0,
+    density TEXT DEFAULT 'comfortable',
+    card_style TEXT DEFAULT 'glass',
+    ai_translate INTEGER NOT NULL DEFAULT 0,
+    ai_reply_style TEXT DEFAULT 'brief',
+    energy_save INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -198,6 +203,18 @@ async def init_db() -> None:
             "SELECT id, 'default' FROM accounts WHERE auth_state = 'ok'"
         )
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_phone ON accounts(phone)")
+        # Старые базы не знают про настройки внешнего вида/AI — добавляем колонки на лету.
+        prefs_cursor = await conn.execute("PRAGMA table_info(account_preferences)")
+        pref_columns = {row["name"] for row in await prefs_cursor.fetchall()}
+        for column, ddl in {
+            "density": "TEXT DEFAULT 'comfortable'",
+            "card_style": "TEXT DEFAULT 'glass'",
+            "ai_translate": "INTEGER NOT NULL DEFAULT 0",
+            "ai_reply_style": "TEXT DEFAULT 'brief'",
+            "energy_save": "INTEGER NOT NULL DEFAULT 0",
+        }.items():
+            if column not in pref_columns:
+                await conn.execute(f"ALTER TABLE account_preferences ADD COLUMN {column} {ddl}")
         # Уникальность номера включаем только после чистки дублей
         # (scripts/cleanup_duplicates.py): иначе индекс не создастся и старт упадёт.
         duplicates = await conn.execute(

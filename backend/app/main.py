@@ -28,6 +28,7 @@ from app.api.messages import router as messages_router
 from app.api.privacy import router as privacy_router
 from app.api.notifications import router as notifications_router
 from app.api.profile import router as profile_router
+from app.api.settings import router as settings_router
 from app.api.users import router as users_router
 from app.api.textstyles import router as textstyles_router
 from app.api.themes import router as themes_router
@@ -132,6 +133,7 @@ for api_router in (
     widgets_router,
     profile_router,
     users_router,
+    settings_router,
     health_router,
 ):
     app.include_router(api_router, prefix="/api")

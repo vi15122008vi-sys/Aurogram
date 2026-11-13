@@ -26,6 +26,21 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Плотность/стиль карточек/энергосбережение применяем до открытия настроек.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("aurogram.ui");
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Record<string, unknown>;
+      const root = document.documentElement;
+      if (typeof saved.density === "string") root.dataset.density = saved.density;
+      if (typeof saved.card_style === "string") root.dataset.cardStyle = saved.card_style;
+      root.dataset.energy = saved.energy_save ? "on" : "off";
+    } catch {
+      /* повреждённое значение — игнорируем */
+    }
+  }, []);
+
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);

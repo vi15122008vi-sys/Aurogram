@@ -321,3 +321,34 @@ button:active, [role="button"]:active { transform: scale(.97); }
   }
 }
 
+/* ── Плотность интерфейса: масштабируем rem-размеры всего приложения ── */
+html[data-density="compact"] { font-size: 15px; }
+html[data-density="comfortable"] { font-size: 16px; }
+html[data-density="spacious"] { font-size: 17.5px; }
+
+/* ── Стиль карточек: Liquid Glass / Flat / Neo ── */
+html[data-card-style="flat"] .glass-panel,
+html[data-card-style="flat"] .glass-modal,
+html[data-card-style="flat"] .glass-message,
+html[data-card-style="flat"] .glass-surface {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--surface) !important;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 6%) !important;
+}
+html[data-card-style="neo"] .glass-panel,
+html[data-card-style="neo"] .glass-modal,
+html[data-card-style="neo"] .glass-surface {
+  box-shadow: 0 22px 48px rgb(0 0 0 / 22%), inset 0 1px 0 var(--glass-highlight) !important;
+}
+
+/* ── Энергосбережение: никаких анимаций и тяжёлого blur ── */
+html[data-energy="on"] *,
+html[data-energy="on"] *::before,
+html[data-energy="on"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
