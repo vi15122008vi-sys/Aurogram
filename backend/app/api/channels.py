@@ -8,8 +8,8 @@ import secrets
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 from telethon import utils
 from telethon.tl.functions.channels import (
     EditAdminRequest,
@@ -18,7 +18,7 @@ from telethon.tl.functions.channels import (
     InviteToChannelRequest,
 )
 from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.types import ChannelParticipantsAdmins, ChatAdminRights, ChatBannedRights, Query, Response
+from telethon.tl.types import ChannelParticipantsAdmins, ChatAdminRights, ChatBannedRights
 from pydantic import BaseModel, Field
 
 from app.antispam.checker import check_message
