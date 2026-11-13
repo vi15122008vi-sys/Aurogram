@@ -8,7 +8,8 @@ import { MessageList } from "./MessageList";
 import { PostEditor } from "./PostEditor";
 import { useI18n } from "../lib/i18n";
 
-type ChannelTab = "posts" | "stats" | "calendar" | "admins" | "settings";
+type ChannelTab = "posts" | "calendar" | "studio" | "stats" | "admins" | "settings";
+type TabGroup = "publish" | "engage" | "manage";
 
 interface ChannelDetailProps {
   channel: ChannelRecord;
@@ -18,10 +19,17 @@ interface ChannelDetailProps {
   initialSchedule?: boolean;
 }
 
+const tabGroups: { id: TabGroup; label: string; children: ChannelTab[] }[] = [
+  { id: "publish", label: "Публикации", children: ["posts", "calendar"] },
+  { id: "engage", label: "Вовлечение", children: ["studio"] },
+  { id: "manage", label: "Управление", children: ["stats", "admins", "settings"] },
+];
+
 const tabs: { id: ChannelTab; label: string; icon: typeof Radio }[] = [
   { id: "posts", label: "Посты", icon: MessageSquareText },
   { id: "stats", label: "Статистика", icon: ChartNoAxesColumn },
   { id: "calendar", label: "Календарь", icon: CalendarClock },
+  { id: "studio", label: "Студия", icon: Wrench },
   { id: "admins", label: "Админы", icon: Users },
   { id: "settings", label: "Настройки", icon: Settings2 },
 ];
@@ -36,6 +44,7 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
   const [studioOpen, setStudioOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<{ subscribers: number; views: number; online: number } | null>(null);
+  const [group, setGroup] = useState<TabGroup>("publish");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,6 +81,16 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
     return () => { activeRequest = false; };
   }, [active, channel.id]);
 
+  const allowed = (id: ChannelTab) => isAdmin !== false || id === "posts" || id === "stats";
+  const groupChildren = (tabGroups.find((item) => item.id === group)?.children ?? []).filter(allowed);
+
+  useEffect(() => {
+    if (!groupChildren.includes(active)) {
+      const first = groupChildren[0];
+      if (first) setActive(first);
+    }
+  }, [group, isAdmin]);
+
   const title = details?.title ?? channel.title;
   const username = details?.username ?? channel.username;
   const subscribers = details?.subscribers ?? channel.subscribers;
@@ -99,19 +118,38 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
         {[
           { label: t("Подписчики"), value: summary?.subscribers ?? subscribers, icon: Users },
           { label: t("Просмотры"), value: summary?.views, icon: ChartNoAxesColumn },
-          { label: t("Онлайн"), value: summary?.online, icon: Radio },
-        ].map(({ label, value, icon: Icon }) => (
+          { label: t("Онлайн"), value: summary?.online, icon: Radio, dash: summary?.online === 0 },
+        ].map(({ label, value, icon: Icon, dash }) => (
           <div key={label} className="glass-panel rounded-[20px] p-3">
             <span className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-muted"><Icon size={11} />{label}</span>
-            <p className="mt-1.5 font-mono text-lg font-medium tabular-nums text-ink">
-              {typeof value === "number" ? value.toLocaleString(locale === "ru" ? "ru-RU" : "en-US") : "—"}
+            <p className={`mt-1.5 font-mono text-lg font-medium tabular-nums ${dash ? "text-[11px] text-muted" : "text-ink"}`}>
+              {dash ? t("Нет данных") : typeof value === "number" ? value.toLocaleString(locale === "ru" ? "ru-RU" : "en-US") : "—"}
             </p>
           </div>
         ))}
       </div>
 
+      <div role="tablist" aria-label={t("Раздел канала")} className="mt-5 flex gap-1 overflow-x-auto rounded-full bg-surface/50 p-1">
+        {tabGroups.map(({ id, label }) => {
+          const visible = isAdmin !== false || id !== "engage";
+          if (!visible) return null;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={group === id}
+              onClick={() => setGroup(id)}
+              className={`flex-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${group === id ? "bg-accent/10 text-accent" : "text-muted hover:text-ink"}`}
+            >
+              {t(label)}
+            </button>
+          );
+        })}
+      </div>
+
       <div role="tablist" aria-label={t("Раздел канала")} className="mt-6 flex gap-1 overflow-x-auto border-b border-line">
-        {(isAdmin === false ? tabs.filter((item) => item.id === "posts" || item.id === "stats") : tabs).map(({ id, label, icon: Icon }) => (
+        {tabs.filter((item) => groupChildren.includes(item.id)).map(({ id, label, icon: Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={active === id} onClick={() => setActive(id)} className={`inline-flex h-10 shrink-0 items-center gap-2 border-b-2 px-3 text-xs font-medium transition ${active === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"}`}>
             <Icon size={15} strokeWidth={1.7} />{t(label)}
           </button>
@@ -128,6 +166,25 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
           <Stat label={t("Чат обсуждений")} value={details?.linked_chat_id ? t("Привязан") : t("Не привязан")} />
         </div>}
         {active === "calendar" && <CalendarPanel channelId={channel.id} />}
+        {active === "studio" && (
+          <div className="grid gap-2 sm:grid-cols-3">
+            {([
+              ["widgets", t("Виджеты"), t("Игры и опросы для постов")],
+              ["stickers", t("Стикеры"), t("Стикерпаки и фон")],
+              ["welcome", t("Приветствие"), t("Текст и фото новичкам")],
+            ] as const).map(([section, title, hint]) => (
+              <button
+                key={section}
+                type="button"
+                onClick={() => setStudioOpen(true)}
+                className="glass-panel flex flex-col items-start gap-1 rounded-[20px] p-3 text-left transition hover:bg-accent/5"
+              >
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink"><Wrench size={13} className="text-accent" />{title}</span>
+                <span className="text-[11px] text-muted">{hint}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {active === "admins" && <AdminsPanel channelId={channel.id} />}
         {active === "settings" && <dl className="max-w-3xl divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
           <Info label={t("Название")} value={title} />

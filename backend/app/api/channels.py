@@ -11,9 +11,14 @@ from typing import Any, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from telethon import utils
-from telethon.tl.functions.channels import EditBannedRequest, GetParticipantsRequest, InviteToChannelRequest
+from telethon.tl.functions.channels import (
+    EditAdminRequest,
+    EditBannedRequest,
+    GetParticipantsRequest,
+    InviteToChannelRequest,
+)
 from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.types import ChannelParticipantsAdmins, ChatBannedRights, Query, Response
+from telethon.tl.types import ChannelParticipantsAdmins, ChatAdminRights, ChatBannedRights, Query, Response
 from pydantic import BaseModel, Field
 
 from app.antispam.checker import check_message
@@ -486,12 +491,10 @@ class WelcomePayload(BaseModel):
     photo_data_url: Optional[str] = None
 
 
-@router.get("/{channel_id}/summary")
-async def channel_summary(
-    channel_id: int,
-    account: dict[str, Any] = Depends(get_current_account),
-) -> dict[str, Any]:
-    """Сводка канала: подписчики, суммарные просмотры постов, онлайн."""
+async def _full_stats(account: dict[str, Any], channel_id: int) -> dict[str, Any]:
+    """Подписчики/онлайн из ChannelFull + просмотры по всем постам из кэша."""
+    import json as _json
+
     client = await get_client(account["id"], account)
     entity = await with_floodwait(lambda: client.get_entity(channel_id))
     subscribers = int(getattr(entity, "participants_count", 0) or 0)
@@ -502,13 +505,43 @@ async def channel_summary(
         subscribers = subscribers or int(getattr(full.full_chat, "participants_count", 0) or 0)
     except Exception:
         online = 0
+
     views = 0
+    source = "cache"
+    conn = await connect_cache(account["id"])
     try:
-        messages = await with_floodwait(lambda: client.get_messages(entity, limit=100))
-        views = sum(int(getattr(message, "views", 0) or 0) for message in (messages or []))
-    except Exception:
-        views = 0
-    return {"subscribers": subscribers, "views": views, "online": online}
+        cursor = await conn.execute(
+            "SELECT raw_json FROM cached_messages WHERE chat_id = ? AND deleted = 0 AND raw_json IS NOT NULL",
+            (channel_id,),
+        )
+        rows = await cursor.fetchall()
+    finally:
+        await conn.close()
+    for row in rows:
+        try:
+            payload = _json.loads(row["raw_json"] or "{}")
+        except ValueError:
+            continue
+        views += int(payload.get("views") or 0)
+    return {"subscribers": subscribers, "views": views, "online": online, "source": source, "posts_counted": len(rows)}
+
+
+@router.get("/{channel_id}/stats/full")
+async def channel_stats_full(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    await _require_channel_admin(account, channel_id)
+    return await _full_stats(account, channel_id)
+
+
+@router.get("/{channel_id}/summary")
+async def channel_summary(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    """Сводка канала: подписчики, суммарные просмотры постов, онлайн."""
+    return await _full_stats(account, channel_id)
 
 
 @router.get("/{channel_id}/admins")
@@ -552,6 +585,24 @@ class AdminInvite(BaseModel):
     username: str = Field(min_length=2, max_length=64)
 
 
+async def _has_invite_rights(account: dict[str, Any], channel_id: int) -> bool:
+    from telethon.tl.functions.channels import GetParticipantRequest
+
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(channel_id))
+    try:
+        result = await with_floodwait(
+            lambda: client(GetParticipantRequest(channel=entity, participant="me"))
+        )
+    except Exception:
+        return False
+    participant = result.participant
+    if type(participant).__name__.endswith("Creator") or bool(getattr(participant, "creator", False)):
+        return True
+    rights = getattr(participant, "admin_rights", None)
+    return bool(getattr(rights, "invite_users", False)) if rights else False
+
+
 @router.post("/{channel_id}/admins")
 async def invite_channel_admin(
     channel_id: int,
@@ -559,6 +610,8 @@ async def invite_channel_admin(
     account: dict[str, Any] = Depends(get_current_account),
 ) -> dict[str, Any]:
     await _require_channel_admin(account, channel_id)
+    if not await _has_invite_rights(account, channel_id):
+        raise HTTPException(status_code=403, detail="У вас нет права приглашать админов")
     client = await get_client(account["id"], account)
     entity = await with_floodwait(lambda: client.get_entity(channel_id))
     target = await with_floodwait(lambda: client.get_entity(payload.username.strip().lstrip("@")))
@@ -580,17 +633,31 @@ async def remove_channel_admin(
     entity = await with_floodwait(lambda: client.get_entity(channel_id))
     target = await with_floodwait(lambda: client.get_entity(user_id))
     try:
+        # Снимаем админ-права, оставляя пользователя в канале.
         await with_floodwait(
             lambda: client(
-                EditBannedRequest(
+                EditAdminRequest(
                     channel=entity,
-                    participant=target,
-                    banned_rights=ChatBannedRights(until_date=None, view_messages=True),
+                    user_id=target,
+                    admin_rights=ChatAdminRights(),
+                    rank="",
                 )
             )
         )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Не удалось удалить админа: {exc}") from exc
+    except Exception as demote_exc:
+        log.warning("demote failed, falling back to kick: %s", demote_exc)
+        try:
+            await with_floodwait(
+                lambda: client(
+                    EditBannedRequest(
+                        channel=entity,
+                        participant=target,
+                        banned_rights=ChatBannedRights(until_date=None, view_messages=True),
+                    )
+                )
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Не удалось снять права: {exc}") from exc
     return {"status": "ok", "user_id": user_id}
 
 
