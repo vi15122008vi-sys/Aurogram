@@ -20,7 +20,13 @@ from app.telegram.messages import delete_message, list_messages, react_to_messag
 import asyncio
 import logging
 
-from telethon.errors import ChannelPrivateError, FloodWaitError, ServerError
+from telethon.errors import (
+    AuthKeyUnregisteredError,
+    ChannelPrivateError,
+    FloodWaitError,
+    ServerError,
+    SessionRevokedError,
+)
 
 log = logging.getLogger("aurogram.messages")
 
@@ -38,7 +44,14 @@ async def _safe_list_messages(account: dict, chat_id: int, limit: int, offset_id
     except FloodWaitError as exc:
         wait = int(getattr(exc, "seconds", 0) or 0)
         log.warning("messages: floodwait %ss for chat %s", wait, chat_id)
-        await asyncio.sleep(min(wait, 60))
+        if wait > 60:
+            # Долгое ожидание: не держим HTTP-запрос, отдаём точное время фронтенду.
+            raise HTTPException(
+                status_code=429,
+                detail=f"Telegram просит подождать {wait} секунд",
+                headers={"Retry-After": str(wait)},
+            ) from exc
+        await asyncio.sleep(max(1, wait))
         try:
             return await list_messages(
                 account, chat_id, limit=limit, offset_id=offset_id, ghost=ghost
@@ -52,10 +65,16 @@ async def _safe_list_messages(account: dict, chat_id: int, limit: int, offset_id
             ) from retry_exc
     except ChannelPrivateError as exc:
         log.warning("messages: channel %s is private: %s", chat_id, exc)
-        return []
+        raise HTTPException(status_code=403, detail="Нет доступа к каналу") from exc
+    except (AuthKeyUnregisteredError, SessionRevokedError) as exc:
+        log.warning("messages: session dead for account %s: %s", account["id"][:8], exc)
+        raise HTTPException(status_code=401, detail="Сессия истекла, войдите заново") from exc
+    except (TimeoutError, ConnectionError) as exc:
+        log.warning("messages: telegram unreachable: %s", exc)
+        raise HTTPException(status_code=504, detail="Сервер Telegram не отвечает") from exc
     except ServerError as exc:
         log.warning("messages: telegram server error for %s: %s", chat_id, exc)
-        return []
+        raise HTTPException(status_code=502, detail="Telegram вернул ошибку") from exc
 
 
 

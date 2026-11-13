@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { ArrowDownToLine, LoaderCircle, Pin, PinOff, Send, StopCircle, Video } from "lucide-react";
-import { api, type MessageRecord } from "../lib/api";
+import { ApiError, api, type MessageRecord } from "../lib/api";
 import { springPress } from "../lib/motion";
 import { isOfflineError, readCache, writeCache } from "../lib/offline";
 import { OfflineBanner } from "../components/OfflineBanner";
@@ -62,6 +62,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   const [sending, setSending] = useState(false);
   const [lastSentId, setLastSentId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authExpired, setAuthExpired] = useState(false);
   const [offline, setOffline] = useState(false);
   const [reactionTarget, setReactionTarget] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
@@ -94,6 +95,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
         writeCache(cacheKey, result);
       })
       .catch((cause: unknown) => {
+        if (cause instanceof ApiError && cause.status === 401) setAuthExpired(true);
         if (!active) return;
         // Нет сети — поднимаем последнюю копию переписки из localStorage.
         if (isOfflineError(cause)) {
@@ -270,6 +272,22 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
           </div>
         ))}
       </div>
+      {authExpired && (
+        <div role="alert" className="mx-3 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[16px] bg-danger/10 px-3 py-2 text-xs text-danger">
+          <span>{t("Сессия истекла, войдите заново")}</span>
+          <button
+            type="button"
+            onClick={async () => {
+              try { await api.auth.logout(); } catch { /* ignore */ }
+              window.location.reload();
+            }}
+            className="rounded-full bg-danger px-3 py-1 text-[11px] font-semibold text-white"
+          >
+            {t("Войти заново")}
+          </button>
+        </div>
+      )}
+
       {error && <p role="alert" className="bg-danger/10 px-3 py-2 text-xs text-danger shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ink)_4%,transparent)]">{error}</p>}
       {allowSend && <form onSubmit={send} className="flex items-center gap-2 bg-surface/30 p-2.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ink)_4%,transparent)] sm:p-3">
         {recordingStream && <video ref={videoPreviewRef} autoPlay muted playsInline className="size-10 shrink-0 rounded-full object-cover shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_50%,transparent)]" />}
