@@ -454,6 +454,19 @@ export const api = {
     admined: () => request<ChannelRecord[]>("/channels/admined"),
     get: (channelId: number) => request<ChannelDetails>(`/channels/${channelId}`),
     access: (channelId: number) => request<{ is_admin: boolean }>(`/channels/${channelId}/access`),
+    summary: (channelId: number) =>
+      request<{ subscribers: number; views: number; online: number }>(`/channels/${channelId}/summary`),
+    admins: (channelId: number) =>
+      request<{ user_id: number; name: string; username: string | null; role: string; is_self: boolean }[]>(
+        `/channels/${channelId}/admins`,
+      ),
+    inviteAdmin: (channelId: number, username: string) =>
+      request<{ status: string; user_id: number }>(`/channels/${channelId}/admins`, {
+        method: "POST",
+        body: json({ username }),
+      }),
+    removeAdmin: (channelId: number, userId: number) =>
+      request<{ status: string }>(`/channels/${channelId}/admins/${userId}`, { method: "DELETE" }),
     publishedPosts: (channelId: number, limit = 200) =>
       request<{ id: number; text: string; date: string }[]>(`/channels/${channelId}/posts?published=true&limit=${limit}`),
     movePost: (channelId: number, postId: number, scheduleAt: string) =>

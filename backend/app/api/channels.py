@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, Query, Response
+from fastapi.responses import FileResponse
+from telethon import utils
+from telethon.tl.functions.channels import EditBannedRequest, GetParticipantsRequest, InviteToChannelRequest
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.types import ChannelParticipantsAdmins, ChatBannedRights, Query, Response
 from pydantic import BaseModel, Field
 
 from app.antispam.checker import check_message
@@ -480,6 +484,114 @@ class WelcomePayload(BaseModel):
     text: str = Field(default="", max_length=1024)
     enabled: bool = True
     photo_data_url: Optional[str] = None
+
+
+@router.get("/{channel_id}/summary")
+async def channel_summary(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    """Сводка канала: подписчики, суммарные просмотры постов, онлайн."""
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(channel_id))
+    subscribers = int(getattr(entity, "participants_count", 0) or 0)
+    online = 0
+    try:
+        full = await with_floodwait(lambda: client(GetFullChannelRequest(channel=entity)))
+        online = int(getattr(full.full_chat, "online_count", 0) or 0)
+        subscribers = subscribers or int(getattr(full.full_chat, "participants_count", 0) or 0)
+    except Exception:
+        online = 0
+    views = 0
+    try:
+        messages = await with_floodwait(lambda: client.get_messages(entity, limit=100))
+        views = sum(int(getattr(message, "views", 0) or 0) for message in (messages or []))
+    except Exception:
+        views = 0
+    return {"subscribers": subscribers, "views": views, "online": online}
+
+
+@router.get("/{channel_id}/admins")
+async def channel_admins(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> list[dict[str, Any]]:
+    await _require_channel_admin(account, channel_id)
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(channel_id))
+    result = await with_floodwait(
+        lambda: client(
+            GetParticipantsRequest(
+                channel=entity,
+                filter=ChannelParticipantsAdmins(),
+                offset=0,
+                limit=100,
+                hash=0,
+            )
+        )
+    )
+    users = {user.id: user for user in result.users}
+    out: list[dict[str, Any]] = []
+    for participant in result.participants:
+        user = users.get(participant.user_id)
+        if not user:
+            continue
+        name = " ".join(filter(None, [getattr(user, "first_name", ""), getattr(user, "last_name", "")])).strip()
+        role = "Владелец" if type(participant).__name__.endswith("Creator") else "Админ"
+        out.append({
+            "user_id": user.id,
+            "name": name or (getattr(user, "username", None) or str(user.id)),
+            "username": getattr(user, "username", None),
+            "role": role,
+            "is_self": bool(getattr(user, "is_self", False)),
+        })
+    return out
+
+
+class AdminInvite(BaseModel):
+    username: str = Field(min_length=2, max_length=64)
+
+
+@router.post("/{channel_id}/admins")
+async def invite_channel_admin(
+    channel_id: int,
+    payload: AdminInvite,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    await _require_channel_admin(account, channel_id)
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(channel_id))
+    target = await with_floodwait(lambda: client.get_entity(payload.username.strip().lstrip("@")))
+    try:
+        await with_floodwait(lambda: client(InviteToChannelRequest(channel=entity, users=[target])))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Не удалось пригласить: {exc}") from exc
+    return {"status": "ok", "user_id": utils.get_peer_id(target)}
+
+
+@router.delete("/{channel_id}/admins/{user_id}")
+async def remove_channel_admin(
+    channel_id: int,
+    user_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    await _require_channel_admin(account, channel_id)
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(channel_id))
+    target = await with_floodwait(lambda: client.get_entity(user_id))
+    try:
+        await with_floodwait(
+            lambda: client(
+                EditBannedRequest(
+                    channel=entity,
+                    participant=target,
+                    banned_rights=ChatBannedRights(until_date=None, view_messages=True),
+                )
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Не удалось удалить админа: {exc}") from exc
+    return {"status": "ok", "user_id": user_id}
 
 
 @router.get("/{channel_id}/access")
