@@ -8,7 +8,8 @@ import secrets
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse, Query, Response
 from pydantic import BaseModel, Field
 
 from app.antispam.checker import check_message
@@ -16,6 +17,8 @@ from app.antispam.log import metrics_24h, read_log
 from app.antispam.settings import dump_settings, load_channel_settings
 from app.antispam.stopwords import add_history, ensure_seeded, list_words, load_builtin
 from app.config import get_settings
+from app.telegram.client import get_client
+from app.telegram.floodwait import with_floodwait
 from app.database import execute, fetchall, fetchone
 from app.deps import decrypt_secret, encrypt_secret, get_current_account
 from app.models import (
@@ -30,6 +33,31 @@ from app.models import (
 from app.telegram.channels import get_channel_full, list_admined_public_channels, list_channels
 
 router = APIRouter(prefix="/channels", tags=["channels"])
+
+async def _require_channel_admin(account: dict[str, Any], channel_id: int) -> None:
+    """403, если у аккаунта нет прав администратора/владельца канала (Telethon GetParticipant)."""
+    try:
+        from telethon.tl.functions.channels import GetParticipantRequest
+
+        client = await get_client(account["id"], account)
+        result = await with_floodwait(
+            lambda: client(GetParticipantRequest(channel=channel_id, participant="me"))
+        )
+        participant = result.participant
+        creator = bool(getattr(participant, "creator", False)) or type(participant).__name__.endswith("Creator")
+        rights = getattr(participant, "admin_rights", None)
+        if not creator and rights is None:
+            raise PermissionError
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail="Нужны права администратора канала",
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=403, detail=f"Нет доступа к каналу: {exc}") from exc
+
 
 
 def _validate_category(category: str) -> None:
@@ -127,6 +155,7 @@ async def save_integrations(
     payload: IntegrationUpdate,
     account: dict[str, Any] = Depends(get_current_account),
 ) -> dict[str, Any]:
+    await _require_channel_admin(account, channel_id)
     row = await _integration_row(account["id"], channel_id) or {}
     webhook = row.get("discord_webhook_enc")
     vk_token = row.get("vk_token_enc")
@@ -458,6 +487,7 @@ async def get_welcome(
     channel_id: int,
     account: dict[str, Any] = Depends(get_current_account),
 ) -> dict[str, Any]:
+    await _require_channel_admin(account, channel_id)
     row = await fetchone(
         "SELECT text, photo_path, enabled, updated_at FROM channel_welcome WHERE account_id = ? AND channel_id = ?",
         (account["id"], channel_id),
@@ -472,12 +502,29 @@ async def get_welcome(
     }
 
 
+@router.get("/{channel_id}/welcome/photo")
+async def get_welcome_photo(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> FileResponse:
+    await _require_channel_admin(account, channel_id)
+    row = await fetchone(
+        "SELECT photo_path FROM channel_welcome WHERE account_id = ? AND channel_id = ?",
+        (account["id"], channel_id),
+    )
+    path = row["photo_path"] if row else None
+    if not path or not Path(path).exists():
+        raise HTTPException(status_code=404, detail="Фото приветствия не найдено")
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=60"})
+
+
 @router.put("/{channel_id}/welcome")
 async def save_welcome(
     channel_id: int,
     payload: WelcomePayload,
     account: dict[str, Any] = Depends(get_current_account),
 ) -> dict[str, Any]:
+    await _require_channel_admin(account, channel_id)
     photo_path: Optional[str] = None
     if payload.photo_data_url:
         import base64

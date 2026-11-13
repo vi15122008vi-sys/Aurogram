@@ -154,7 +154,16 @@ async def _on_chat_action(account: dict, client: Any, event: Any) -> None:
         text = (row["text"] or "").strip()
         photo = row["photo_path"]
         user = getattr(event, "user", None)
-        greeting = text.replace("{name}", (getattr(user, "first_name", "") or "")) if text else None
+        chat_title = ""
+        try:
+            chat_title = getattr(getattr(event, "chat", None), "title", "") or ""
+        except Exception:
+            chat_title = ""
+        greeting = (
+            text.replace("{user_name}", (getattr(user, "first_name", "") or ""))
+            .replace("{channel_name}", chat_title)
+            .replace("{name}", (getattr(user, "first_name", "") or ""))
+        ) if text else None
         if photo and Path(photo).exists():
             await client.send_file(chat_id, photo, caption=greeting or "")
         elif greeting:

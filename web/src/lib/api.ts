@@ -454,6 +454,8 @@ export const api = {
     admined: () => request<ChannelRecord[]>("/channels/admined"),
     get: (channelId: number) => request<ChannelDetails>(`/channels/${channelId}`),
     welcome: {
+      photoUrl: (channelId: number, version = 0) =>
+        apiUrl(`/channels/${channelId}/welcome/photo${version ? `?v=${version}` : ""}`),
       get: (channelId: number) =>
         request<{ text: string; enabled: boolean; has_photo: boolean; updated_at: string | null }>(`/channels/${channelId}/welcome`),
       save: (channelId: number, payload: { text: string; enabled: boolean; photo_data_url?: string | null }) =>
