@@ -43,7 +43,8 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
   const [postsReloadKey, setPostsReloadKey] = useState(0);
   const [studioOpen, setStudioOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [summary, setSummary] = useState<{ subscribers: number; views: number; online: number } | null>(null);
+  const [summary, setSummary] = useState<{ subscribers: number; views: number; online: number; source?: string } | null>(null);
+  const [studioSection, setStudioSection] = useState<"widgets" | "stickers" | "welcome">("widgets");
   const [group, setGroup] = useState<TabGroup>("publish");
   const [error, setError] = useState<string | null>(null);
 
@@ -117,14 +118,15 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
       <div className="mt-5 grid grid-cols-3 gap-2">
         {[
           { label: t("Подписчики"), value: summary?.subscribers ?? subscribers, icon: Users },
-          { label: t("Просмотры"), value: summary?.views, icon: ChartNoAxesColumn },
+          { label: summary?.source === "cache" ? t("Просмотры ≈") : t("Просмотры"), value: summary?.views, icon: ChartNoAxesColumn, approx: summary?.source === "cache" },
           { label: t("Онлайн"), value: summary?.online, icon: Radio, dash: summary?.online === 0 },
-        ].map(({ label, value, icon: Icon, dash }) => (
+        ].map(({ label, value, icon: Icon, dash, approx }) => (
           <div key={label} className="glass-panel rounded-[20px] p-3">
             <span className="inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-muted"><Icon size={11} />{label}</span>
             <p className={`mt-1.5 font-mono text-lg font-medium tabular-nums ${dash ? "text-[11px] text-muted" : "text-ink"}`}>
               {dash ? t("Нет данных") : typeof value === "number" ? value.toLocaleString(locale === "ru" ? "ru-RU" : "en-US") : "—"}
             </p>
+            {approx && <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-muted">{t("Приблизительно")}</p>}
           </div>
         ))}
       </div>
@@ -176,7 +178,7 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
               <button
                 key={section}
                 type="button"
-                onClick={() => setStudioOpen(true)}
+                onClick={() => { setStudioSection(section); setStudioOpen(true); }}
                 className="glass-panel flex flex-col items-start gap-1 rounded-[20px] p-3 text-left transition hover:bg-accent/5"
               >
                 <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink"><Wrench size={13} className="text-accent" />{title}</span>
@@ -193,7 +195,13 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
           <Info label={t("Чат обсуждений")} value={details?.linked_chat_id ? String(details.linked_chat_id) : t("Не привязан")} mono />
         </dl>}
       </div>
-      <StudioModal open={studioOpen} onClose={() => setStudioOpen(false)} channelId={channel.id} channelTitle={title} />
+      <StudioModal
+        open={studioOpen}
+        onClose={() => setStudioOpen(false)}
+        channelId={channel.id}
+        channelTitle={title}
+        initialSection={studioSection}
+      />
     </section>
   );
 }

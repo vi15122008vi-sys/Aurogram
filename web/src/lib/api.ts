@@ -455,7 +455,7 @@ export const api = {
     get: (channelId: number) => request<ChannelDetails>(`/channels/${channelId}`),
     access: (channelId: number) => request<{ is_admin: boolean }>(`/channels/${channelId}/access`),
     summary: (channelId: number) =>
-      request<{ subscribers: number; views: number; online: number }>(`/channels/${channelId}/summary`),
+      request<{ subscribers: number; views: number; online: number; source?: string }>(`/channels/${channelId}/summary`),
     admins: (channelId: number) =>
       request<{ user_id: number; name: string; username: string | null; role: string; is_self: boolean }[]>(
         `/channels/${channelId}/admins`,

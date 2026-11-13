@@ -373,7 +373,23 @@ async def _page_data(page: str) -> dict[str, Any]:
             "listener": await get_listener_heartbeat(),
         }
     if page == "accounts":
-        rows = await fetchall("SELECT id, phone, name, username, auth_state, created_at, last_sync FROM accounts ORDER BY created_at DESC")
+        # Один аккаунт на номер: приоритет — рабочая сессия, затем самая свежая запись.
+        rows = await fetchall(
+            """SELECT id, phone, name, username, auth_state, created_at, last_sync
+               FROM accounts
+               WHERE id IN (
+                   SELECT id FROM (
+                       SELECT id, phone,
+                              ROW_NUMBER() OVER (
+                                  PARTITION BY phone
+                                  ORDER BY (auth_state = 'ok') DESC, created_at DESC
+                              ) AS rn
+                       FROM accounts
+                   ) ranked
+                   WHERE rn = 1
+               )
+               ORDER BY created_at DESC"""
+        )
         return {"rows": [dict(row) for row in rows]}
     if page == "channels" or page == "antispam":
         rows = await fetchall(

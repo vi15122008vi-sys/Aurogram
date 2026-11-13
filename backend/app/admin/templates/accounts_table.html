@@ -24,7 +24,15 @@
         <td class="p-3">{{ row.name or '—' }}</td>
         <td class="p-3 font-mono">{{ row.phone }}</td>
         <td class="p-3 text-zinc-400">{{ row.username or '—' }}</td>
-        <td class="p-3"><span class="rounded-full bg-white/[0.05] px-2 py-0.5 text-[11px] text-zinc-300">{{ row.auth_state }}</span></td>
+        <td class="p-3">
+          {% if row.auth_state == 'ok' %}
+          <span class="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300">онлайн</span>
+          {% elif row.auth_state == 'pending' %}
+          <span class="rounded-full bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-300">ожидает код</span>
+          {% else %}
+          <span class="rounded-full bg-zinc-500/10 px-2 py-0.5 text-[11px] text-zinc-400">Требуется вход</span>
+          {% endif %}
+        </td>
         <td class="p-3 text-zinc-500">{{ row.created_at }}</td>
       </tr>
       {% else %}
