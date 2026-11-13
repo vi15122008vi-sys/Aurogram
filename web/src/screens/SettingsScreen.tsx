@@ -145,6 +145,16 @@ export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) 
     }
   }, [soundEnabled, vibration, previews, quietFrom, quietTo, autoDownload, cacheGb]);
 
+  async function syncPrefs() {
+    try {
+      await api.settings.saveNotifications({
+        sound: soundEnabled, vibration, previews, quietFrom, quietTo, autoDownload, cacheGb,
+      });
+    } catch {
+      /* офлайн: останется локальная копия */
+    }
+  }
+
   async function clearCache() {
     if (!window.confirm(t("Очистить кэш приложения? Медиа и сообщения будут загружены заново.", "Clear the app cache? Media and messages will be re-downloaded."))) return;
     setCacheBusy(true);
@@ -157,13 +167,43 @@ export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) 
           removed += 1;
         }
       }
-      setCacheNotice(`${t("Кэш очищен", "Cache cleared")} (${removed})`);
+      try {
+        await api.settings.purgeCache();
+        setCacheNotice(t("Серверный и локальный кэш очищены", "Server and local cache cleared"));
+      } catch {
+        setCacheNotice(`${t("Локальный кэш очищен", "Local cache cleared")} (${removed})`);
+      }
     } catch (cause) {
       setCacheNotice(cause instanceof Error ? cause.message : t("Не удалось очистить кэш"));
     } finally {
       setCacheBusy(false);
     }
   }
+
+  useEffect(() => {
+    let active = true;
+    api.settings
+      .notifications()
+      .then((saved) => {
+        if (!active) return;
+        if (typeof saved.sound === "boolean") setSoundEnabled(saved.sound);
+        if (typeof saved.vibration === "boolean") setVibration(saved.vibration);
+        if (typeof saved.previews === "boolean") setPreviews(saved.previews);
+        if (typeof saved.quietFrom === "string") setQuietFrom(saved.quietFrom);
+        if (typeof saved.quietTo === "string") setQuietTo(saved.quietTo);
+        if (saved.autoDownload === "wifi" || saved.autoDownload === "always") setAutoDownload(saved.autoDownload);
+        if (typeof saved.cacheGb === "number") setCacheGb(saved.cacheGb);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    void syncPrefs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soundEnabled, vibration, previews, quietFrom, quietTo, autoDownload, cacheGb]);
 
   useEffect(() => {
     const stored = localStorage.getItem("aurogram.theme") as ThemeId | null;

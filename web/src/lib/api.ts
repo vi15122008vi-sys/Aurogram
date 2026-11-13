@@ -593,6 +593,14 @@ export const api = {
   },
   settings: {
     get: () => request<UiSettings>("/settings"),
+    notifications: () => request<Record<string, unknown>>("/settings/notifications"),
+    saveNotifications: (payload: Record<string, unknown>) =>
+      request<{ status: string; settings: Record<string, unknown> }>("/settings/notifications", {
+        method: "PUT",
+        body: json(payload),
+      }),
+    purgeCache: () =>
+      request<null>("/accounts/current/cache/purge", { method: "POST", body: json({ purge_media: true }) }),
     patch: (payload: Partial<UiSettings>) =>
       request<UiSettings>("/settings", { method: "PATCH", body: json(payload) }),
   },

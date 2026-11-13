@@ -29,6 +29,8 @@ class SettingsUpdate(BaseModel):
     ai_translate: Optional[bool] = None
     ai_reply_style: Optional[REPLY_STYLE] = None
     energy_save: Optional[bool] = None
+    # Клиентские предпочтения (уведомления/медиа) — JSON в accounts.settings_json.
+    notifications: Optional[dict[str, Any]] = None
 
 
 async def _load(account_id: str) -> dict[str, Any]:
@@ -88,3 +90,39 @@ async def update_settings(
         ),
     )
     return await _load(account["id"])
+
+
+async def _load_client_prefs(account_id: str) -> dict[str, Any]:
+    from app.database import fetchone as _fetchone
+
+    row = await _fetchone("SELECT settings_json FROM accounts WHERE id = ?", (account_id,))
+    if not row or not row["settings_json"]:
+        return {}
+    import json
+
+    try:
+        return json.loads(row["settings_json"])
+    except ValueError:
+        return {}
+
+
+@router.put("/notifications")
+async def save_notifications(
+    payload: dict[str, Any],
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    """Сохраняет настройки уведомлений/медиа в accounts.settings_json."""
+    import json
+
+    current = await _load_client_prefs(account["id"])
+    current.update({key: value for key, value in payload.items() if isinstance(key, str)})
+    await execute(
+        "UPDATE accounts SET settings_json = ? WHERE id = ?",
+        (json.dumps(current, ensure_ascii=False), account["id"]),
+    )
+    return {"status": "ok", "settings": current}
+
+
+@router.get("/notifications")
+async def get_notifications(account: dict[str, Any] = Depends(get_current_account)) -> dict[str, Any]:
+    return await _load_client_prefs(account["id"])

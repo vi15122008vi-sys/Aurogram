@@ -36,6 +36,31 @@ class ProfileUpdate(BaseModel):
         return value
 
 
+async def _telegram_registered_at(account: dict[str, Any]) -> str | None:
+    """Пытается получить реальную дату регистрации в Telegram (GetFullUserRequest).
+
+    Telegram не отдаёт её публичным полем: если атрибута нет — вернём None,
+    и вызывающий код подставит accounts.created_at.
+    """
+    try:
+        from telethon.tl.functions.users import GetFullUserRequest
+
+        from app.telegram.client import get_client
+        from app.telegram.floodwait import with_floodwait
+
+        client = await get_client(account["id"], account)
+        full = await with_floodwait(lambda: client(GetFullUserRequest("me")))
+        for candidate in ("registration_date", "date", "created_at"):
+            value = getattr(getattr(full, "full_user", full), candidate, None)
+            if value is not None:
+                return value.isoformat() if hasattr(value, "isoformat") else str(value)
+    except Exception as exc:
+        import logging
+
+        logging.getLogger("aurogram.users").info("registration date unavailable: %s", exc)
+    return None
+
+
 async def _profile_row(account_id: str) -> dict[str, Any]:
     row = await fetchone("SELECT * FROM account_profiles WHERE account_id = ?", (account_id,))
     if not row:
@@ -84,7 +109,7 @@ async def users_me(account: dict[str, Any] = Depends(get_current_account)) -> di
             "username": account.get("username"),
             "phone": account.get("phone") or "",
             "auth_state": account.get("auth_state"),
-            "created_at": account.get("created_at"),
+            "created_at": await _telegram_registered_at(account) or account.get("created_at"),
         },
         "profile": {
             "display_name": profile["display_name"],

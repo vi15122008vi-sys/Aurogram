@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at TEXT DEFAULT (datetime('now')),
     last_sync TEXT,
     meta_json TEXT DEFAULT '{}',
+    settings_json TEXT DEFAULT '{}',
     UNIQUE (phone)
 );
 
@@ -230,6 +231,8 @@ async def init_db() -> None:
         account_columns = {row["name"] for row in await accounts_cursor.fetchall()}
         if "tg_user_id" not in account_columns:
             await conn.execute("ALTER TABLE accounts ADD COLUMN tg_user_id INTEGER")
+        if "settings_json" not in account_columns:
+            await conn.execute("ALTER TABLE accounts ADD COLUMN settings_json TEXT DEFAULT '{}'")
         for column, ddl in {
             "density": "TEXT DEFAULT 'comfortable'",
             "card_style": "TEXT DEFAULT 'glass'",

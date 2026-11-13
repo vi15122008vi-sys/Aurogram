@@ -13,6 +13,34 @@ from app.telegram.client import drop_client
 router = APIRouter(prefix="/privacy", tags=["privacy"])
 
 
+async def _apply_ghost(account: dict[str, Any], hidden: bool) -> bool:
+    """Скрывает/показывает статус в самом Telegram (UpdateStatus + SetPrivacy)."""
+    try:
+        from telethon.tl.functions.account import UpdateStatusRequest
+        from telethon.tl.functions.account import SetPrivacyRequest
+        from telethon.tl.types import (
+            InputPrivacyKeyStatusTimestamp,
+            InputPrivacyValueAllowAll,
+            InputPrivacyValueDisallowAll,
+        )
+
+        from app.telegram.client import get_client
+        from app.telegram.floodwait import with_floodwait
+
+        client = await get_client(account["id"], account)
+        await with_floodwait(lambda: client(UpdateStatusRequest(offline=hidden)))
+        rules = [InputPrivacyValueDisallowAll()] if hidden else [InputPrivacyValueAllowAll()]
+        await with_floodwait(
+            lambda: client(SetPrivacyRequest(key=InputPrivacyKeyStatusTimestamp(), rules=rules))
+        )
+        return True
+    except Exception as exc:
+        import logging
+
+        logging.getLogger("aurogram.privacy").warning("ghost mode failed: %s", exc)
+        return False
+
+
 class PrivacyUpdate(BaseModel):
     hide_online: bool | None = None
     no_read_receipts: bool | None = None
@@ -50,6 +78,8 @@ async def update_privacy(
             await set_online_visibility(account, updated["hide_online"])
         except Exception as exc:
             raise HTTPException(status_code=502, detail="Не удалось обновить видимость статуса в Telegram") from exc
+    if "hide_online" in getattr(payload, "model_fields_set", set()):
+        await _apply_ghost(account, bool(payload.hide_online))
     await execute(
         """INSERT INTO account_preferences (account_id, hide_online, no_read_receipts, hide_device_type)
            VALUES (?, ?, ?, ?)

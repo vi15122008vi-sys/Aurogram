@@ -129,8 +129,8 @@ export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
     }
   }
 
-  function clearLocalCache() {
-    if (!window.confirm(t("Очистить локальный кэш? Данные будут загружены заново.", "Clear local cache? Data will be re-downloaded."))) return;
+  async function clearLocalCache() {
+    if (!window.confirm(t("Очистить кэш аккаунта (сервер + локально)? Данные будут загружены заново.", "Clear account cache (server + local)? Data will be re-downloaded."))) return;
     let removed = 0;
     for (const key of Object.keys(localStorage)) {
       if (key.startsWith("aurogram.cache.") || key.startsWith("aurogram.chats.")) {
@@ -138,7 +138,12 @@ export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
         removed += 1;
       }
     }
-    setQuickNotice(`${t("Кэш очищен", "Cache cleared")} (${removed})`);
+    try {
+      await api.settings.purgeCache();
+      setQuickNotice(`${t("Серверный и локальный кэш очищены", "Server and local cache cleared")} (${removed})`);
+    } catch (cause) {
+      setQuickNotice(cause instanceof Error ? cause.message : `${t("Локальный кэш очищен", "Local cache cleared")} (${removed})`);
+    }
   }
 
   async function exportData() {
@@ -332,7 +337,7 @@ export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
             <span className="grid size-8 place-items-center rounded-[10px] bg-accent/10 text-accent">{ghostBusy ? <Loader2 size={14} className="animate-spin" /> : <Ghost size={14} />}</span>
             <span className="text-[11px] font-medium text-ink">Ghost Mode</span>
           </button>
-          <button type="button" onClick={clearLocalCache} className="flex flex-col items-start gap-1.5 rounded-[18px] bg-surface/50 p-3 text-left transition hover:bg-danger/10">
+          <button type="button" onClick={() => void clearLocalCache()} className="flex flex-col items-start gap-1.5 rounded-[18px] bg-surface/50 p-3 text-left transition hover:bg-danger/10">
             <span className="grid size-8 place-items-center rounded-[10px] bg-danger/10 text-danger"><Database size={14} /></span>
             <span className="text-[11px] font-medium text-ink">{t("Очистить кэш")}</span>
           </button>
