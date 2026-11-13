@@ -1,9 +1,9 @@
-import { Bot, MessageCircle, Rss, UserRound } from "lucide-react";
+import { Bot, MessageCircle, Rss, Settings2, UserRound } from "lucide-react";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { springPress } from "../lib/motion";
 
-export type AppTab = "channels" | "bots" | "chats" | "settings";
+export type AppTab = "chats" | "channels" | "bots" | "profile" | "settings";
 
 interface BottomNavProps {
   active: AppTab;
@@ -15,14 +15,15 @@ const items = [
   { id: "chats", label: "Чаты", icon: MessageCircle },
   { id: "channels", label: "Каналы", icon: Rss },
   { id: "bots", label: "Боты", icon: Bot },
-  { id: "settings", label: "Профиль", icon: UserRound },
+  { id: "profile", label: "Профиль", icon: UserRound },
+  { id: "settings", label: "Настройки", icon: Settings2 },
 ] as const;
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
   const { t } = useI18n();
   return (
     <nav aria-label={t("Основная навигация")} className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-      <div className="glass-panel mx-auto grid h-16 max-w-md grid-cols-4 gap-1 rounded-[26px] p-1.5">
+      <div className="glass-panel mx-auto grid h-16 max-w-lg grid-cols-5 gap-1 rounded-[26px] p-1.5">
         {items.map(({ id, label, icon: Icon }) => {
           const selected = active === id;
           return (

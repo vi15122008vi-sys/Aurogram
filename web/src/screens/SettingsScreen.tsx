@@ -13,7 +13,7 @@ interface SettingsProps {
   onLogout?: () => void;
 }
 
-export function Settings({ accountName, phone, onLogout }: SettingsProps) {
+export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) {
   const { locale, setLocale, t } = useI18n();
   const [privacy, setPrivacy] = useState<PrivacyPreferences>({ hide_online: false, no_read_receipts: true, hide_device_type: false });
   const [privacyBusy, setPrivacyBusy] = useState(false);

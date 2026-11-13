@@ -202,6 +202,33 @@ export interface ProfileStats {
   media: number;
 }
 
+export interface MyProfile {
+  account: {
+    id: string;
+    name: string;
+    username: string | null;
+    phone: string;
+    auth_state: "ok" | "pending" | "dead" | null;
+  };
+  profile: {
+    display_name: string | null;
+    bio: string | null;
+    birthday: string | null;
+    channel_id: number | null;
+    pinned_story_ids: number[];
+    updated_at: string | null;
+  };
+  stats: { messages: number; chats: number; channels: number };
+}
+
+export interface ProfilePatch {
+  display_name?: string | null;
+  bio?: string | null;
+  birthday?: string | null;
+  channel_id?: number | null;
+  pinned_story_ids?: number[];
+}
+
 export interface AiAnswer {
   answer: string;
   model: string;
@@ -497,6 +524,14 @@ export const api = {
       form.append("caption", caption);
       return request<MessageRecord>(`/editor/channels/${channelId}/photos`, { method: "POST", body: form });
     },
+  },
+  users: {
+    me: () => request<MyProfile>("/users/me"),
+    update: (payload: ProfilePatch) =>
+      request<{ status: string; profile: MyProfile["profile"] }>("/users/me", {
+        method: "PATCH",
+        body: json(payload),
+      }),
   },
   profile: {
     stats: () => request<ProfileStats>("/profile/stats"),

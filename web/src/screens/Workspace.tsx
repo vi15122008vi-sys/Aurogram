@@ -6,7 +6,7 @@ import { Channels } from "./Channels";
 import { ChannelDetail } from "./ChannelDetail";
 import { MessageList } from "./MessageList";
 import { ProfileScreen } from "./ProfileScreen";
-import { Settings } from "./Settings";
+import { SettingsScreen } from "./SettingsScreen";
 import { ChatList, type ChatFilter } from "./ChatList";
 import { isOfflineError, readCache, writeCache } from "../lib/offline";
 import { useI18n } from "../lib/i18n";
@@ -42,7 +42,6 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   const [selectedChannel, setSelectedChannel] = useState<{ id: number; title: string; username: string | null; subscribers: number; posts_count: number } | null>(null);
   const [selectedChannelTab, setSelectedChannelTab] = useState<"posts" | "stats">("posts");
   const [selectedChat, setSelectedChat] = useState<ChatRecord | null>(null);
-  const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
   const [scheduleFocus, setScheduleFocus] = useState(false);
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const [archivingId, setArchivingId] = useState<number | null>(null);
@@ -60,7 +59,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   }, [tab]);
 
   useEffect(() => {
-    if (tab === "settings" || tab === "channels") return;
+    if (tab === "settings" || tab === "channels" || tab === "profile") return;
     let active = true;
     setLoading(true);
     setError(null);
@@ -118,22 +117,12 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
         />;
   }
 
+  if (tab === "profile") {
+    return <ProfileScreen account={account} onLogout={onLogout} />;
+  }
+
   if (tab === "settings") {
-    if (profileSettingsOpen) {
-      return (
-        <section className="animate-[rise-in_240ms_ease-out]">
-          <button
-            type="button"
-            onClick={() => setProfileSettingsOpen(false)}
-            className="mb-4 inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface hover:text-ink"
-          >
-            ‹ {t("Профиль")}
-          </button>
-          <Settings accountName={account.name || account.phone} phone={account.phone} onLogout={onLogout} />
-        </section>
-      );
-    }
-    return <ProfileScreen account={account} onLogout={onLogout} onOpenSettings={() => setProfileSettingsOpen(true)} />;
+    return <SettingsScreen accountName={account.name || account.phone} phone={account.phone} onLogout={onLogout} />;
   }
 
   if (tab === "chats" || (tab === "bots" && selectedChat)) {
@@ -149,7 +138,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     return <ChatList chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={(chat) => void toggleChatArchive(chat)} archivingId={archivingId} loading={loading} error={error} offline={offline} />;
   }
 
-  const content = tabContent[tab];
+  const content = tabContent[tab as keyof typeof tabContent];
   const Icon = content.icon;
   return (
     <section className="animate-[rise-in_240ms_ease-out]">
