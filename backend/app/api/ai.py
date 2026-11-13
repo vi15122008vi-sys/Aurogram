@@ -5,7 +5,8 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.ai import AiError, AiNotConfigured, summarize_text
+from app.ai import AiError, AiNotConfigured, ask_with_context, summarize_text
+from app.cache.manager import connect_cache
 from app.deps import get_current_account
 from app.ratelimit import AI_LIMITER, limit_requests
 from app.telegram.client import get_client
@@ -14,6 +15,11 @@ from app.telegram.floodwait import with_floodwait
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 MIN_TEXT_CHARS = 40
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+    limit: int = Field(default=50, ge=10, le=200)
 
 
 class SummarizeRequest(BaseModel):
@@ -49,6 +55,58 @@ async def summarize(
         raise HTTPException(
             status_code=503,
             detail="AI-суммаризация не настроена: задайте AI_API_KEY в окружении бэкенда",
+        ) from exc
+    except AiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+async def _recent_dialog_context(account_id: str, limit: int) -> tuple[str, int]:
+    """Последние сообщения из кэша: «[дата] чат: текст»."""
+    conn = await connect_cache(account_id)
+    try:
+        cursor = await conn.execute(
+            """
+            SELECT m.date, m.text, c.title, c.type
+            FROM cached_messages m
+            LEFT JOIN cached_chats c ON c.id = m.chat_id
+            WHERE m.deleted = 0 AND m.text IS NOT NULL AND TRIM(m.text) <> ''
+            ORDER BY m.date DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+    finally:
+        await conn.close()
+
+    lines: list[str] = []
+    for row in reversed(rows):
+        chat = row["title"] or ("ЛС" if row["type"] == "user" else "чат")
+        text = " ".join(str(row["text"]).split())
+        if len(text) > 400:
+            text = text[:400] + "…"
+        lines.append(f"[{row['date']}] {chat}: {text}")
+    return "\n".join(lines), len(rows)
+
+
+@router.post("/ask", dependencies=[Depends(limit_requests(AI_LIMITER, "ai.ask"))])
+async def ask(
+    payload: AskRequest,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    """Вопрос по своей переписке: последние N сообщений из кэша + LLM."""
+    context, count = await _recent_dialog_context(account["id"], payload.limit)
+    if not count:
+        raise HTTPException(
+            status_code=422,
+            detail="В кэше пока нет сообщений — откройте чаты, чтобы они загрузились",
+        )
+    try:
+        return await ask_with_context(payload.question, context, messages=count)
+    except AiNotConfigured as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI-ассистент не настроен: задайте AI_API_KEY в окружении бэкенда",
         ) from exc
     except AiError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

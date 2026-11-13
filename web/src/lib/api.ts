@@ -186,6 +186,29 @@ export interface AiSummary {
   source_chars: number;
 }
 
+export interface ProfileStats {
+  account: {
+    id: string;
+    name: string;
+    username: string | null;
+    phone: string;
+    auth_state: "ok" | "pending" | "dead" | null;
+  };
+  messages: number;
+  chats: number;
+  channels: number;
+  groups: number;
+  direct: number;
+  media: number;
+}
+
+export interface AiAnswer {
+  answer: string;
+  model: string;
+  context_chars: number;
+  context_messages: number;
+}
+
 export interface ChannelIntegrations {
   discord_webhook_set: boolean;
   discord_webhook_hint: string | null;
@@ -475,7 +498,13 @@ export const api = {
       return request<MessageRecord>(`/editor/channels/${channelId}/photos`, { method: "POST", body: form });
     },
   },
+  profile: {
+    stats: () => request<ProfileStats>("/profile/stats"),
+    exportData: () => download("/profile/export"),
+  },
   ai: {
+    ask: (question: string, limit = 50) =>
+      request<AiAnswer>("/ai/ask", { method: "POST", body: json({ question, limit }) }),
     summarize: (payload: { text?: string; chat_id?: number; message_id?: number; sentences?: number }) =>
       request<AiSummary>("/ai/summarize", { method: "POST", body: json(payload) }),
   },

@@ -1,4 +1,4 @@
-import { Bot, MessageCircle, Rss, Settings2 } from "lucide-react";
+import { Bot, MessageCircle, Rss, UserRound } from "lucide-react";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { springPress } from "../lib/motion";
@@ -15,7 +15,7 @@ const items = [
   { id: "chats", label: "Чаты", icon: MessageCircle },
   { id: "channels", label: "Каналы", icon: Rss },
   { id: "bots", label: "Боты", icon: Bot },
-  { id: "settings", label: "Настройки", icon: Settings2 },
+  { id: "settings", label: "Профиль", icon: UserRound },
 ] as const;
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
