@@ -24,7 +24,7 @@ export function Accounts({ accounts, onSelect }: AccountsProps) {
       <div className="mt-6 grid gap-2">
         {accounts.map((account) => (
           <button key={account.id} type="button" onClick={() => onSelect?.(account)} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left hover:bg-raised">
-            <Avatar name={account.name} id={account.id} className="size-10 border border-white/10" />
+            <Avatar name={account.name} id={account.id} className="size-10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--ink)_8%,transparent)]" />
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{account.name}</span><span className="mt-1 block truncate font-mono text-xs text-muted">{account.username ? `@${account.username}` : account.phone}</span></span>
             {account.active && <Check size={17} className="text-accent" />}
           </button>
@@ -34,3 +34,4 @@ export function Accounts({ accounts, onSelect }: AccountsProps) {
     </section>
   );
 }
+

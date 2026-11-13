@@ -14,20 +14,42 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --canvas: #0a0a0b;
-  --surface: #111116;
-  --surface-raised: #18181b;
-  --border: rgb(255 255 255 / 6%);
-  --raised: #18181b;
+  /* Базовый набор переменных = тема aurogram.
+     Остальные темы пишут эти же переменные inline из src/lib/themes.ts
+     (applyTheme), поэтому цветов конкретных тем в этом файле больше нет.
+     Пара «--x» + «--x-rgb» нужна Tailwind: alpha-утилиты (bg-accent/10,
+     border-line/40) собираются как rgb(var(--x-rgb) / <alpha-value>). */
+  --canvas: #0a0a0c;
+  --canvas-rgb: 10 10 12;
+  --surface: #111114;
+  --surface-rgb: 17 17 20;
+  --surface-raised: #191920;
+  --surface-raised-rgb: 25 25 32;
+  --border: rgb(255 255 255 / 3%);
+  --raised: #191920;
+  --raised-rgb: 25 25 32;
   --ink: #fafafa;
+  --ink-rgb: 250 250 250;
   --muted: #a1a1aa;
-  --line: rgb(255 255 255 / 6%);
+  --muted-rgb: 161 161 170;
+  --line: rgb(255 255 255 / 3.2%);
+  --glass-fill: rgb(255 255 255 / 4.5%);
+  --glass-highlight: rgb(255 255 255 / 8%);
+  --glass-blur: 26px;
+  --theme-glow: rgb(99 102 241 / 16%);
+  --on-accent: #ffffff;
   --accent: #6366f1;
+  --accent-rgb: 99 102 241;
   --accent-strong: #818cf8;
+  --accent-strong-rgb: 129 140 248;
   --success: #22c55e;
+  --success-rgb: 34 197 94;
   --warning: #f59e0b;
+  --warning-rgb: 245 158 11;
   --danger: #ef4444;
+  --danger-rgb: 239 68 68;
   --ghost: #a78bfa;
+  --ghost-rgb: 167 139 250;
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-raised: var(--raised);
@@ -41,127 +63,18 @@
   --color-danger: var(--danger);
   --color-ghost: var(--ghost);
   --radius-control: 8px;
+  /* Liquid Glass: радиусы и «обводка» собраны здесь, чтобы компоненты
+     не заводили собственные рамки. */
+  --radius-card: 20px;
+  --radius-panel: 24px;
+  --radius-modal: 28px;
+  --ring: inset 0 0 0 1px var(--border);
+  --glass-shadow: 0 18px 48px rgb(0 0 0 / 12%);
 }
 
-:root[data-theme="paper"] {
-  color-scheme: light;
-  --canvas: #f7f7f8;
-  --surface: #ffffff;
-  --raised: #f1f1f3;
-  --ink: #18181b;
-  --muted: #71717a;
-  --line: rgb(24 24 27 / 9%);
-  --accent: #18181b;
-  --accent-strong: #3f3f46;
-  --ghost: #7c3aed;
-  --surface-raised: #f1f1f3;
-  --border: rgb(24 24 27 / 9%);
-}
-
-:root[data-theme="mint"] {
-  color-scheme: light;
-  --canvas: #f2f8f5;
-  --surface: #ffffff;
-  --raised: #e9f2ed;
-  --ink: #17211b;
-  --muted: #65756a;
-  --line: rgb(23 33 27 / 9%);
-  --accent: #10b981;
-  --accent-strong: #059669;
-  --ghost: #6d5bd0;
-  --surface-raised: #e9f2ed;
-  --border: rgb(23 33 27 / 9%);
-}
-
-:root[data-theme="sky"] {
-  color-scheme: light;
-  --canvas: #f2f7fa;
-  --surface: #ffffff;
-  --raised: #e9f1f6;
-  --ink: #14202a;
-  --muted: #647584;
-  --line: rgb(20 32 42 / 9%);
-  --accent: #0ea5e9;
-  --accent-strong: #0284c7;
-  --ghost: #7658c8;
-  --surface-raised: #e9f1f6;
-  --border: rgb(20 32 42 / 9%);
-}
-
-:root[data-theme="ghost"] {
-  color-scheme: dark;
-  --canvas: #0c0b10;
-  --surface: #14121a;
-  --raised: #1c1924;
-  --ink: #faf8ff;
-  --muted: #aaa4b5;
-  --line: rgb(255 255 255 / 7%);
-  --accent: #a78bfa;
-  --accent-strong: #c4b5fd;
-  --ghost: #c4b5fd;
-  --surface-raised: #1c1924;
-  --border: rgb(255 255 255 / 7%);
-}
-
-:root[data-theme="midnight"] {
-  color-scheme: dark;
-  --canvas: #07070a;
-  --surface: #101013;
-  --raised: #19191d;
-  --ink: #f7f7f8;
-  --muted: #a1a1aa;
-  --line: rgb(255 255 255 / 7%);
-  --accent: #f59e0b;
-  --accent-strong: #fbbf24;
-  --ghost: #a78bfa;
-  --surface-raised: #19191d;
-  --border: rgb(255 255 255 / 7%);
-}
-
-:root[data-theme="ocean"] {
-  color-scheme: dark;
-  --canvas: #061016;
-  --surface: #0c1920;
-  --raised: #12232c;
-  --ink: #f0fbff;
-  --muted: #9bb0ba;
-  --line: rgb(255 255 255 / 7%);
-  --accent: #06b6d4;
-  --accent-strong: #22d3ee;
-  --ghost: #a78bfa;
-  --surface-raised: #12232c;
-  --border: rgb(255 255 255 / 7%);
-}
-
-:root[data-theme="sunset"] {
-  color-scheme: dark;
-  --canvas: #10080c;
-  --surface: #1a1015;
-  --raised: #24151c;
-  --ink: #fff7f8;
-  --muted: #c0a8ae;
-  --line: rgb(255 255 255 / 7%);
-  --accent: #f43f5e;
-  --accent-strong: #fb7185;
-  --ghost: #c4b5fd;
-  --surface-raised: #24151c;
-  --border: rgb(255 255 255 / 7%);
-}
-
-:root[data-theme="orange"] {
-  color-scheme: dark;
-  --canvas: #160d08; --surface: #21130b; --raised: #2d1a0e; --ink: #fff7ed; --muted: #c4a58d;
-  --line: rgb(255 255 255 / 8%); --accent: #f97316; --accent-strong: #fb923c; --ghost: #c084fc;
-  --surface-raised: #2d1a0e; --border: rgb(255 255 255 / 8%);
-}
-
-:root[data-theme="halloween"] {
-  color-scheme: dark;
-  --canvas: #1a0b0b; --surface: #251111; --raised: #321818; --ink: #fff7f2; --muted: #c4a8a3;
-  --line: rgb(255 255 255 / 8%); --accent: #f97316; --accent-strong: #fb923c; --ghost: #7c3aed;
-  --surface-raised: #321818; --border: rgb(255 255 255 / 8%);
-  --theme-glow: rgb(124 58 237 / 12%);
-}
+/* Светлая/тёмная схема, фоновое свечение, тинт стекла и размытие задаются
+   темой и приходят из src/lib/themes.ts — см. --theme-glow, --glass-fill,
+   --glass-blur, --glass-highlight, --on-accent. */
 
 * {
   box-sizing: border-box;
@@ -256,13 +169,21 @@ kbd {
   text-underline-offset: 2px;
 }
 
+/* ── Liquid Glass ─────────────────────────────────────────────────────────
+   Внешних обводок нет. «Край» стекла имитирует inset-ring из --border
+   (alpha 0.02–0.04), объём — верхний блик, мягкая внешняя тень и blur. */
 .glass-panel {
-  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
-  background: color-mix(in srgb, var(--surface) 45%, transparent);
-  box-shadow: 0 14px 42px rgb(0 0 0 / 16%), inset 0 1px 0 rgb(255 255 255 / 3%);
-  border-radius: 24px;
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  border: 0;
+  background: linear-gradient(145deg, var(--glass-fill), color-mix(in srgb, var(--surface) 58%, transparent));
+  box-shadow: var(--ring), inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 rgb(0 0 0 / 4%), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+}
+
+/* Радиус по умолчанию — без захвата специфичности, поэтому любой
+   rounded-* в разметке по-прежнему главнее. */
+:where(.glass-panel) {
+  border-radius: var(--radius-panel);
 }
 
 .glass-hover {
@@ -270,17 +191,22 @@ kbd {
 }
 
 .glass-hover:hover:not(:disabled) {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 26px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .glass-message {
-  border: 1px solid rgb(255 255 255 / 8%);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 12%), inset 0 1px 0 rgb(255 255 255 / 4%);
+  border: 0;
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  box-shadow: var(--ring), inset 0 1px 0 var(--glass-highlight), 0 10px 26px rgb(0 0 0 / 8%);
 }
 
-button, [role="button"] { transition: transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease, background-color 180ms ease; }
+button, [role="button"] {
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 6px 18px rgb(0 0 0 / 8%);
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease, background-color 180ms ease;
+}
 button:active, [role="button"]:active { transform: scale(.97); }
 @media (hover: none) and (pointer: coarse) {
   button:active, [role="button"]:active { animation: tactile-pulse 90ms ease-out; }
@@ -289,12 +215,12 @@ button:active, [role="button"]:active { transform: scale(.97); }
 .glass-modal {
   position: relative;
   isolation: isolate;
-  border: 1px solid color-mix(in srgb, var(--ink) 15%, transparent);
-  border-radius: 28px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 82%, white 4%), color-mix(in srgb, var(--canvas) 74%, transparent));
-  box-shadow: 0 28px 90px rgb(0 0 0 / 38%), inset 0 1px 0 rgb(255 255 255 / 12%), inset 0 -1px 0 rgb(255 255 255 / 3%);
-  -webkit-backdrop-filter: blur(28px) saturate(165%);
-  backdrop-filter: blur(28px) saturate(165%);
+  border: 0;
+  border-radius: var(--radius-modal);
+  background: linear-gradient(145deg, var(--glass-fill), color-mix(in srgb, var(--surface) 72%, transparent));
+  box-shadow: var(--ring), inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 rgb(0 0 0 / 4%), 0 28px 80px rgb(0 0 0 / 28%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
 }
 
 .glass-modal::before {
@@ -315,12 +241,63 @@ button:active, [role="button"]:active { transform: scale(.97); }
 }
 
 .glass-message-in {
-  background: rgb(255 255 255 / 4%);
+  background: var(--glass-fill);
 }
 
 .glass-message-out {
-  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
   background: color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
+    inset 0 1px 0 var(--glass-highlight),
+    0 10px 26px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* Любая «стеклянная» поверхность: тинт из темы + blur вместо рамки. */
+[class*="bg-surface"],
+[class*="bg-raised"],
+[class*="bg-surfaceRaised"] {
+  border-color: color-mix(in srgb, var(--ink) 4%, transparent);
+  background-color: color-mix(in srgb, var(--surface) 34%, transparent);
+  background-image: linear-gradient(145deg, var(--glass-fill), color-mix(in srgb, var(--surface) 58%, transparent));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  box-shadow: var(--ring), inset 0 1px 0 var(--glass-highlight), 0 10px 28px rgb(0 0 0 / 8%);
+}
+
+[class*="rounded-xl"][class*="bg-surface"],
+[class*="rounded-2xl"][class*="bg-surface"],
+[class*="rounded-xl"][class*="bg-raised"],
+[class*="rounded-2xl"][class*="bg-raised"] {
+  border-radius: var(--radius-card);
+}
+
+/* Жёстких обводок в интерфейсе больше нет: любая border-утилита из темы
+   становится волосяной (2–4% alpha) и читается как блик на кромке стекла. */
+[class*="border-line"],
+[class*="border-border"] {
+  border-color: color-mix(in srgb, var(--ink) 3.5%, transparent);
+}
+
+/* Разделитель строк в списках — внутренняя линия, а не border ячейки. */
+.glass-divider {
+  height: 1px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+/* Плавающая стеклянная поверхность с гарантированным сильным скруглением. */
+.glass-surface {
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: linear-gradient(145deg, var(--glass-fill), color-mix(in srgb, var(--surface) 62%, transparent));
+  box-shadow: var(--ring), inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+}
+
+/* Подпись на акцентной кнопке берётся из темы: у ярких акцентов
+   (Orange #F97316, Midnight #EAB308) белый текст нечитаем, там нужен тёмный. */
+.bg-accent.text-white {
+  color: var(--on-accent, #fff);
 }
 
 .safe-bottom {
@@ -329,7 +306,7 @@ button:active, [role="button"]:active { transform: scale(.97); }
 
 .app-shell {
   min-height: 100vh;
-  padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
 }
 
 .auth-backdrop {
@@ -340,6 +317,6 @@ button:active, [role="button"]:active { transform: scale(.97); }
 
 @media (min-width: 800px) {
   .app-shell {
-    padding-bottom: 3.5rem;
+    padding-bottom: 5.5rem;
   }
 }

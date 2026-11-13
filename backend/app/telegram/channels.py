@@ -24,8 +24,13 @@ async def list_channels(account: dict) -> list[ChannelOut]:
             continue
         last = d.message
         last_at = None
-        if last and last.date:
-            last_at = last.date if last.date.tzinfo else last.date.replace(tzinfo=timezone.utc)
+        views = 0
+        if last is not None:
+            if last.date:
+                last_at = last.date if last.date.tzinfo else last.date.replace(tzinfo=timezone.utc)
+            # Просмотры последнего поста — единственная метрика охвата,
+            # которую Telegram отдаёт без отдельного stats-запроса.
+            views = int(getattr(last, "views", 0) or 0)
         out.append(
             ChannelOut(
                 id=d.id,
@@ -33,6 +38,7 @@ async def list_channels(account: dict) -> list[ChannelOut]:
                 username=getattr(entity, "username", None),
                 subscribers=getattr(entity, "participants_count", 0) or 0,
                 last_post_at=last_at,
+                views=views,
             )
         )
     return out

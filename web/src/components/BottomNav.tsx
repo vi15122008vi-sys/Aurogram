@@ -20,8 +20,8 @@ const items = [
 export function BottomNav({ active, onChange }: BottomNavProps) {
   const { t } = useI18n();
   return (
-    <nav aria-label={t("Основная навигация")} className="glass-panel fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-surface/55 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_36px_rgb(0_0_0_/_18%)] backdrop-blur-glass">
-      <div className="mx-auto grid h-14 max-w-2xl grid-cols-4">
+    <nav aria-label={t("Основная навигация")} className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+      <div className="glass-panel mx-auto grid h-16 max-w-md grid-cols-4 gap-1 rounded-[26px] p-1.5">
         {items.map(({ id, label, icon: Icon }) => {
           const selected = active === id;
           return (
@@ -32,11 +32,20 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
               aria-label={t(label)}
               onClick={() => onChange(id)}
               whileTap={springPress}
-              className={`glass-hover relative mx-1 my-1 flex h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-medium transition duration-200 ${selected ? "bg-accent/10 text-accent" : "text-muted hover:bg-surfaceRaised/70 hover:text-ink"}`}
+              className={`relative flex flex-col items-center justify-center gap-1 rounded-[20px] text-[10px] font-medium transition duration-200 ${selected
+                ? "bg-accent/10 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_18%,transparent),0_8px_20px_color-mix(in_srgb,var(--accent)_16%,transparent)]"
+                : "text-muted hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] hover:text-ink"}`}
             >
               <Icon size={18} strokeWidth={1.5} />
               <span>{t(label)}</span>
-              {selected && <span className="absolute inset-x-5 -top-1 h-px rounded-full bg-accent shadow-[0_0_8px_var(--accent)]" aria-hidden="true" />}
+              {selected && (
+                <motion.span
+                  layoutId="bottom-nav-marker"
+                  className="absolute inset-x-[32%] top-1 h-0.5 rounded-full bg-accent shadow-[0_0_12px_var(--accent)]"
+                  aria-hidden="true"
+                  transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                />
+              )}
             </motion.button>
           );
         })}
@@ -44,3 +53,4 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
     </nav>
   );
 }
+

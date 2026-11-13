@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, ChartNoAxesColumn, Radio, RefreshCw, Search, Send, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ArrowRight, ChartNoAxesColumn, Eye, Radio, RefreshCw, Search, Send, Timer, Users } from "lucide-react";
 import { api, type ChannelRecord } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { useI18n } from "../lib/i18n";
@@ -7,17 +7,23 @@ import { useI18n } from "../lib/i18n";
 interface ChannelsProps {
   onOpen: (channel: ChannelRecord) => void;
   onPublish?: (channel: ChannelRecord) => void;
+  onSchedule?: (channel: ChannelRecord) => void;
   onStatistics?: (channel: ChannelRecord) => void;
 }
 
-export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
-  const { t } = useI18n();
+export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: ChannelsProps) {
+  const { t, locale } = useI18n();
   const [listView, setListView] = useState<"channels" | "mine">("channels");
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  const number = useMemo(
+    () => new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US"),
+    [locale],
+  );
 
   useEffect(() => {
     let active = true;
@@ -40,16 +46,30 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
 
   const filteredChannels = channels.filter((channel) => `${channel.title} ${channel.username ?? ""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
 
+  /* Сводка по всем каналам: просмотры агрегируем только там, где бэкенд их отдал. */
+  const summary = useMemo(() => {
+    const viewsKnown = channels.filter((channel) => typeof channel.views === "number" && channel.views > 0);
+    return {
+      channels: channels.length,
+      subscribers: channels.reduce((sum, channel) => sum + channel.subscribers, 0),
+      views: viewsKnown.length ? viewsKnown.reduce((sum, channel) => sum + (channel.views ?? 0), 0) : null,
+      scheduled: channels.reduce((sum, channel) => sum + (channel.scheduled_count ?? 0), 0),
+      posts: channels.reduce((sum, channel) => sum + (channel.posts_count ?? 0), 0),
+    };
+  }, [channels]);
+
+  const shown = number.format(summary.subscribers);
+
   return (
     <section className="animate-[rise-in_240ms_ease-out]">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("PUBLISHING")}</p>
-          <h1 className="mt-2 text-[28px] font-semibold">{t("Каналы")}</h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("ADMIN CONSOLE")}</p>
+          <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.02em] text-ink">{t("Каналы")}</h1>
         </div>
         <button
           type="button"
-          className="grid size-9 place-items-center rounded-lg border border-line bg-surface text-muted transition hover:bg-raised hover:text-ink disabled:opacity-50"
+          className="grid size-10 place-items-center rounded-full bg-surface/60 text-muted transition hover:text-accent disabled:opacity-50"
           onClick={() => setReloadKey((key) => key + 1)}
           disabled={loading}
           aria-label={t("Обновить каналы")}
@@ -58,43 +78,99 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
-      <div className="mt-5 inline-flex rounded-xl border border-line bg-surface/70 p-1" role="tablist" aria-label={t("Раздел каналов")}>
-        {([ ["channels", "Каналы"], ["mine", "Мои каналы"] ] as const).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={listView === id} onClick={() => setListView(id)} className={`rounded-lg px-3 py-2 text-xs font-medium transition ${listView === id ? "bg-accent/15 text-accent" : "text-muted hover:text-ink"}`}>
-            {t(label)}
-          </button>
-        ))}
+
+      {/* Панель быстрой статистики — витрина админского режима. */}
+      <div className="glass-panel mt-5 grid grid-cols-2 gap-2 rounded-[26px] p-2 sm:grid-cols-4">
+        <Metric label={t("Каналы")} value={number.format(summary.channels)} hint={t("под управлением", "managed")} />
+        <Metric label={t("Подписчики")} value={shown} hint={t("суммарно", "total")} icon={<Users size={13} />} />
+        <Metric
+          label={t("Просмотры")}
+          value={summary.views === null ? "—" : number.format(summary.views)}
+          hint={summary.views === null ? t("нет данных", "no data") : t("по последним постам", "last posts")}
+          icon={<Eye size={13} />}
+        />
+        <Metric
+          label={t("Отложено")}
+          value={number.format(summary.scheduled)}
+          hint={t("в расписании", "scheduled")}
+          icon={<Timer size={13} />}
+          tone={summary.scheduled > 0 ? "accent" : "muted"}
+        />
       </div>
-      <label className="mt-5 flex h-9 max-w-lg items-center gap-2 rounded-lg border border-line bg-surface px-3 text-muted">
-        <Search size={15} />
-        <input aria-label={t("Поиск каналов")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Поиск каналов")} className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
-      </label>
-      {error && <p role="alert" className="mt-5 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-      {filteredChannels.length ? (
-        <div className="mt-6 grid gap-3 md:grid-cols-2">
-          {filteredChannels.map((channel) => (
-            <article key={channel.id} className="group/card rounded-xl border border-border bg-surface/90 p-3.5 transition duration-200 hover:-translate-y-0.5 hover:border-accent/25 hover:bg-surface hover:shadow-[0_12px_36px_rgb(0_0_0_/_18%)]">
-              <button type="button" onClick={() => onOpen(channel)} className="group flex w-full items-center gap-3 text-left">
-                <Avatar name={channel.title} id={channel.id} className="size-10 border border-white/10" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2"><span className="truncate text-sm font-semibold text-ink">{channel.title}</span>{(channel.scheduled_count ?? 0) > 0 && <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent"><span className="size-1.5 rounded-full bg-accent" />{channel.scheduled_count} {t("отложено")}</span>}</span>
-                  <span className="mt-1 block truncate text-xs text-muted">{channel.username ? `@${channel.username}` : `ID ${channel.id}`}</span>
-                  <span className="mt-2 inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-muted"><Users size={12} />{channel.subscribers.toLocaleString("ru-RU")}</span>
-                </span>
-                <ArrowRight size={15} className="shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-accent" />
-              </button>
-              <div className="mt-3 flex gap-2 border-t border-border pt-3">
-                <button type="button" onClick={() => (onPublish ?? onOpen)(channel)} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-xs font-medium text-white transition hover:bg-accent-strong"><Send size={13} strokeWidth={1.5} />{t("Опубликовать")}</button>
-                <button type="button" onClick={() => (onStatistics ?? onOpen)(channel)} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-2 text-xs font-medium text-ink transition hover:border-accent/20 hover:bg-surfaceRaised"><ChartNoAxesColumn size={13} strokeWidth={1.5} />{t("Статистика")}</button>
-              </div>
-            </article>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="glass-panel inline-flex rounded-full p-1" role="tablist" aria-label={t("Раздел каналов")}>
+          {([["channels", "Каналы"], ["mine", "Мои каналы"]] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={listView === id}
+              onClick={() => setListView(id)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${listView === id ? "bg-accent/10 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_16%,transparent)]" : "text-muted hover:text-ink"}`}
+            >
+              {t(label)}
+            </button>
           ))}
         </div>
+        <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-surface/60 px-3.5 text-muted focus-within:text-accent sm:max-w-xs">
+          <Search size={15} />
+          <input aria-label={t("Поиск каналов")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Поиск каналов")} className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
+        </label>
+      </div>
+
+      {error && <p role="alert" className="mt-4 rounded-[20px] bg-danger/10 px-3.5 py-2.5 text-sm text-danger shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--danger)_18%,transparent)]">{error}</p>}
+
+      {filteredChannels.length ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {filteredChannels.map((channel) => {
+            const scheduled = channel.scheduled_count ?? 0;
+            const views = typeof channel.views === "number" && channel.views > 0 ? channel.views : null;
+            return (
+              <article key={channel.id} className="glass-panel group/card rounded-[26px] p-3.5 transition duration-200 hover:-translate-y-0.5 hover:shadow-[var(--ring),inset_0_1px_0_var(--glass-highlight),0_18px_44px_color-mix(in_srgb,var(--accent)_14%,transparent)]">
+                <button type="button" onClick={() => onOpen(channel)} className="group flex w-full items-center gap-3 rounded-[20px] text-left">
+                  <Avatar name={channel.title} id={channel.id} className="size-12 shadow-[0_0_0_1px_color-mix(in_srgb,var(--ink)_8%,transparent),0_8px_20px_rgb(0_0_0_/_18%)]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-ink">{channel.title}</span>
+                      {scheduled > 0 && (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">
+                          <span className="size-1.5 rounded-full bg-accent shadow-[0_0_8px_var(--accent)]" />
+                          {scheduled} {t("отложено")}
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-1 block truncate text-xs text-muted">{channel.username ? `@${channel.username}` : `ID ${channel.id}`}</span>
+                  </span>
+                  <ArrowRight size={15} className="shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-accent" />
+                </button>
+
+                <div className="mt-3 flex items-center gap-4 rounded-[18px] bg-surface/40 px-3 py-2">
+                  <ChannelStat icon={<Users size={12} />} value={number.format(channel.subscribers)} label={t("подписчиков", "subscribers")} />
+                  <ChannelStat icon={<Eye size={12} />} value={views === null ? "—" : number.format(views)} label={t("просмотров", "views")} />
+                  <ChannelStat icon={<Timer size={12} />} value={number.format(scheduled)} label={t("в очереди", "queued")} />
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => (onPublish ?? onOpen)(channel)} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-accent px-3 text-xs font-semibold text-white transition hover:bg-accent-strong">
+                    <Send size={13} strokeWidth={1.7} />{t("Опубликовать")}
+                  </button>
+                  <button type="button" onClick={() => (onSchedule ?? onPublish ?? onOpen)(channel)} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-surface/60 px-3 text-xs font-medium text-ink transition hover:bg-accent/10 hover:text-accent">
+                    <Timer size={13} strokeWidth={1.7} />{t("Отложить")}
+                  </button>
+                  <button type="button" onClick={() => (onStatistics ?? onOpen)(channel)} aria-label={t("Статистика")} title={t("Статистика")} className="grid size-9 shrink-0 place-items-center rounded-full bg-surface/60 text-muted transition hover:bg-accent/10 hover:text-accent">
+                    <ChartNoAxesColumn size={14} strokeWidth={1.7} />
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       ) : (
-        <div className="mt-6 grid min-h-[280px] place-items-center rounded-xl border border-dashed border-line bg-surface/60 px-4 py-6 text-center">
+        <div className="glass-panel mt-4 grid min-h-[280px] place-items-center rounded-[26px] px-4 py-6 text-center">
           <div className="max-w-xs">
-            <span className="mx-auto grid size-12 place-items-center rounded-xl bg-raised text-muted"><Radio size={21} strokeWidth={1.5} /></span>
-            <h2 className="mt-4 text-base font-semibold">{loading ? t("Загружаем каналы…") : query ? t("Совпадений нет") : t("Каналов пока нет")}</h2>
+            <span className="mx-auto grid size-14 place-items-center rounded-[20px] bg-accent/10 text-accent"><Radio size={22} strokeWidth={1.5} /></span>
+            <h2 className="mt-4 text-base font-semibold text-ink">{loading ? t("Загружаем каналы…") : query ? t("Совпадений нет") : t("Каналов пока нет")}</h2>
             {!loading && !error && !query && <p className="mt-2 text-sm leading-6 text-muted">{t(listView === "mine" ? "Здесь появятся публичные каналы, которыми вы управляете." : "Здесь появятся каналы, где у аккаунта есть права администратора.")}</p>}
           </div>
         </div>
@@ -102,3 +178,23 @@ export function Channels({ onOpen, onPublish, onStatistics }: ChannelsProps) {
     </section>
   );
 }
+
+function Metric({ label, value, hint, icon, tone = "muted" }: { label: string; value: string; hint: string; icon?: ReactNode; tone?: "muted" | "accent" }) {
+  return (
+    <div className="rounded-[20px] bg-surface/40 px-3 py-2.5">
+      <p className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted">{icon}{label}</p>
+      <p className={`mt-1.5 font-mono text-[22px] font-medium leading-none tabular-nums ${tone === "accent" ? "text-accent" : "text-ink"}`}>{value}</p>
+      <p className="mt-1 truncate text-[10px] text-muted">{hint}</p>
+    </div>
+  );
+}
+
+function ChannelStat({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted">
+      <span className="text-accent/80">{icon}</span>
+      <span className="truncate"><span className="text-ink">{value}</span> <span className="text-[10px]">{label}</span></span>
+    </span>
+  );
+}
+

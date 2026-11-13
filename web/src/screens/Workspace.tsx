@@ -40,6 +40,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   const [selectedChannel, setSelectedChannel] = useState<{ id: number; title: string; username: string | null; subscribers: number; posts_count: number } | null>(null);
   const [selectedChannelTab, setSelectedChannelTab] = useState<"posts" | "stats">("posts");
   const [selectedChat, setSelectedChat] = useState<ChatRecord | null>(null);
+  const [scheduleFocus, setScheduleFocus] = useState(false);
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const [archivingId, setArchivingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,6 +52,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     setSelectedChannel(null);
     setSelectedChannelTab("posts");
     setSelectedChat(null);
+    setScheduleFocus(false);
   }, [tab]);
 
   useEffect(() => {
@@ -89,11 +91,12 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
 
   if (tab === "channels") {
     return selectedChannel
-      ? <ChannelDetail channel={selectedChannel} initialTab={selectedChannelTab} onBack={() => setSelectedChannel(null)} />
+      ? <ChannelDetail channel={selectedChannel} initialTab={selectedChannelTab} initialSchedule={scheduleFocus} onBack={() => { setSelectedChannel(null); setScheduleFocus(false); }} />
       : <Channels
-          onOpen={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); }}
-          onPublish={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); }}
-          onStatistics={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("stats"); }}
+          onOpen={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(false); }}
+          onPublish={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(false); }}
+          onSchedule={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(true); }}
+          onStatistics={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("stats"); setScheduleFocus(false); }}
         />;
   }
 

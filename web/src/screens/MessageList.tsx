@@ -36,7 +36,7 @@ function VideoNotePlayer({ chatId, messageId }: { chatId: number; messageId: num
     }).catch(() => undefined);
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [chatId, messageId]);
-  return url ? <video src={url} controls playsInline className="mt-1 size-44 rounded-full border border-white/10 bg-black object-cover" /> : <span className="mt-1 grid size-44 place-items-center rounded-full bg-black/20 text-muted"><LoaderCircle size={18} className="animate-spin" /></span>;
+  return url ? <video src={url} controls playsInline className="mt-1 size-44 rounded-full bg-black object-cover shadow-[0_0_0_1px_color-mix(in_srgb,var(--ink)_10%,transparent)]" /> : <span className="mt-1 grid size-44 place-items-center rounded-full bg-black/20 text-muted"><LoaderCircle size={18} className="animate-spin" /></span>;
 }
 
 async function saveMedia(chatId: number, messageId: number) {
@@ -205,29 +205,29 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   }
 
   return (
-    <section className="glass-panel overflow-hidden rounded-2xl">
-      {hasMore && <div className="border-b border-line p-2 text-center"><button type="button" onClick={loadOlder} disabled={loadingOlder} className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs font-medium text-muted hover:bg-raised disabled:opacity-50"><ArrowDownToLine size={14} />{loadingOlder ? t("Загружаем…") : t("Загрузить предыдущие")}</button></div>}
-      <div className="max-h-[55vh] min-h-48 space-y-3 overflow-y-auto bg-black/10 p-3 sm:p-4">
+    <section className="glass-panel overflow-hidden rounded-[26px]">
+      {hasMore && <div className="p-2 text-center shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--ink)_4%,transparent)]"><button type="button" onClick={loadOlder} disabled={loadingOlder} className="inline-flex h-8 items-center gap-2 rounded-full bg-surface/60 px-3.5 text-xs font-medium text-muted hover:text-ink disabled:opacity-50"><ArrowDownToLine size={14} />{loadingOlder ? t("Загружаем…") : t("Загрузить предыдущие")}</button></div>}
+      <div className="max-h-[55vh] min-h-48 space-y-3 overflow-y-auto bg-black/[0.06] p-3 sm:p-4">
         {loading && <div className="flex justify-center py-8 text-muted"><LoaderCircle size={18} className="animate-spin" /></div>}
         {!loading && !messages.length && <p className="py-10 text-center text-sm text-muted">{t("Сообщений нет")}</p>}
         {dateGroups.map((group) => (
           <div key={group.label}>
-            <div className="sticky top-0 z-10 flex justify-center py-1"><span className="rounded-lg border border-line bg-surface px-2.5 py-1 font-mono text-[9px] capitalize text-muted">{group.label}</span></div>
+            <div className="sticky top-0 z-10 flex justify-center py-1"><span className="rounded-full bg-surface/70 px-3 py-1 font-mono text-[9px] capitalize text-muted shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]">{group.label}</span></div>
             <div className="space-y-3 pt-2">
               {group.messages.map((message) => (
                 <motion.article key={`${message.chat_id}:${message.id}`} onDoubleClick={() => setReactionTarget(message.id)} initial={message.id === lastSentId ? { opacity: 0, scale: 0.96, y: 6 } : false} animate={message.id === lastSentId ? { opacity: 1, scale: [0.96, 1.02, 1], y: 0 } : undefined} transition={message.id === lastSentId ? { duration: 0.34, ease: [0.2, 0.85, 0.3, 1] } : undefined} onAnimationComplete={() => { if (message.id === lastSentId) setLastSentId(null); }} className={`flex ${message.out ? "justify-end" : "justify-start"}`}>
-                  <div className={`glass-hover glass-message max-w-[88%] min-w-[min(16rem,88%)] rounded-2xl px-3 py-2.5 sm:max-w-[76%] ${message.out ? "glass-message-out" : "glass-message-in"}`}>
+                  <div className={`glass-hover glass-message max-w-[88%] min-w-[min(16rem,88%)] rounded-[20px] px-3.5 py-2.5 sm:max-w-[76%] ${message.out ? "glass-message-out rounded-br-[8px]" : "glass-message-in rounded-bl-[8px]"}`}>
                     {!message.out && message.sender_name && <p className="mb-1 text-[10px] font-semibold text-accent">{message.sender_name}</p>}
                     {message.text && <p className="whitespace-pre-wrap break-words text-sm leading-5 text-ink">{message.text}</p>}
                     {message.media_type === "video_note" && <VideoNotePlayer chatId={chatId} messageId={message.id} />}
                     {message.media_type === "voice" && <VoicePlayer chatId={chatId} messageId={message.id} durationHint={message.duration} waveform={message.waveform_data} />}
                     {message.media_type && message.media_type !== "voice" && message.media_type !== "video_note" && (
-                      <button type="button" onClick={() => void saveMedia(chatId, message.id).catch((cause: unknown) => setError(t(cause instanceof Error ? cause.message : "Не удалось скачать медиа")))} className="mt-2 inline-flex h-8 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-xs text-muted hover:text-ink">
+                      <button type="button" onClick={() => void saveMedia(chatId, message.id).catch((cause: unknown) => setError(t(cause instanceof Error ? cause.message : "Не удалось скачать медиа")))} className="mt-2 inline-flex h-8 items-center gap-2 rounded-full bg-surface/60 px-3 text-xs text-muted hover:text-ink">
                         <ArrowDownToLine size={13} />{t("Скачать")} {t(message.media_type)}
                       </button>
                     )}
-                    {!!message.reactions?.length && <div className="mt-2 flex flex-wrap gap-1">{message.reactions.map((reaction) => <span key={reaction.emoji} className={`rounded-full border px-2 py-0.5 text-xs ${reaction.chosen ? "border-accent/40 bg-accent/15 text-accent" : "border-line bg-surface/60 text-ink"}`}>{reaction.emoji} {reaction.count}</span>)}</div>}
-                    {reactionTarget === message.id && <div className="mt-2 flex gap-1 rounded-full border border-line bg-surface/90 p-1 shadow-lg" aria-label={t("Выберите реакцию")}>{(["👍", "❤️", "🔥", "😂"] as const).map((emoji) => <motion.button key={emoji} type="button" whileTap={springPress} aria-label={emoji} onClick={() => void chooseReaction(message.id, emoji)} className="grid size-8 place-items-center rounded-full text-lg transition hover:bg-accent/15">{emoji}</motion.button>)}</div>}
+                    {!!message.reactions?.length && <div className="mt-2 flex flex-wrap gap-1">{message.reactions.map((reaction) => <span key={reaction.emoji} className={`rounded-full px-2 py-0.5 text-xs ${reaction.chosen ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_25%,transparent)]" : "bg-surface/60 text-ink shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]"}`}>{reaction.emoji} {reaction.count}</span>)}</div>}
+                    {reactionTarget === message.id && <div className="mt-2 flex gap-1 rounded-full bg-surface/90 p-1 shadow-[0_10px_28px_rgb(0_0_0_/_18%),inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]" aria-label={t("Выберите реакцию")}>{(["👍", "❤️", "🔥", "😂"] as const).map((emoji) => <motion.button key={emoji} type="button" whileTap={springPress} aria-label={emoji} onClick={() => void chooseReaction(message.id, emoji)} className="grid size-8 place-items-center rounded-full text-lg transition hover:bg-accent/15">{emoji}</motion.button>)}</div>}
                     <div className="mt-1.5 flex items-center justify-end gap-2">
                       {allowSend && <motion.button type="button" whileTap={springPress} onClick={() => void togglePinned(message)} aria-label={t(message.pinned ? "Открепить сообщение" : "Закрепить сообщение")} title={t(message.pinned ? "Открепить сообщение" : "Закрепить сообщение")} className={`grid size-6 place-items-center rounded-full transition ${message.pinned ? "text-accent" : "text-muted hover:text-accent"}`}>{message.pinned ? <PinOff size={12} /> : <Pin size={12} />}</motion.button>}
                       {message.pinned && <span className="font-mono text-[9px] text-accent">{t("Закреплено")}</span>}
@@ -240,15 +240,16 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
           </div>
         ))}
       </div>
-      {error && <p role="alert" className="border-t border-line bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
-      {allowSend && <form onSubmit={send} className="flex items-center gap-2 border-t border-line bg-white/[0.02] p-3">
-        {recordingStream && <video ref={videoPreviewRef} autoPlay muted playsInline className="size-10 shrink-0 rounded-full border border-accent object-cover" />}
-        <input value={text} onChange={(event) => setText(event.target.value)} maxLength={4096} placeholder={t("Сообщение…")} className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-raised px-3 text-sm text-ink outline-none focus:border-accent" />
-        <motion.button type="button" whileTap={springPress} disabled={sendingVideo} onClick={recording ? stopVideoNote : () => void startVideoNote()} aria-label={t(recording ? "Остановить запись" : "Записать видеосообщение")} className={`grid size-10 shrink-0 place-items-center rounded-full border border-line text-ink hover:bg-raised disabled:opacity-50 ${recording ? "animate-pulse border-danger text-danger" : ""}`}>
+      {error && <p role="alert" className="bg-danger/10 px-3 py-2 text-xs text-danger shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ink)_4%,transparent)]">{error}</p>}
+      {allowSend && <form onSubmit={send} className="flex items-center gap-2 bg-surface/30 p-2.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ink)_4%,transparent)] sm:p-3">
+        {recordingStream && <video ref={videoPreviewRef} autoPlay muted playsInline className="size-10 shrink-0 rounded-full object-cover shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_50%,transparent)]" />}
+        <input value={text} onChange={(event) => setText(event.target.value)} maxLength={4096} placeholder={t("Сообщение…")} className="h-11 min-w-0 flex-1 rounded-[22px] bg-surface/60 px-4 text-sm text-ink outline-none placeholder:text-muted focus:bg-surface/80 focus:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_35%,transparent)]" />
+        <motion.button type="button" whileTap={springPress} disabled={sendingVideo} onClick={recording ? stopVideoNote : () => void startVideoNote()} aria-label={t(recording ? "Остановить запись" : "Записать видеосообщение")} className={`grid size-11 shrink-0 place-items-center rounded-full bg-surface/60 text-ink transition hover:text-accent disabled:opacity-50 ${recording ? "animate-pulse text-danger shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--danger)_45%,transparent)]" : ""}`}>
           {recording ? <StopCircle size={17} /> : sendingVideo ? <LoaderCircle size={17} className="animate-spin" /> : <Video size={17} />}
         </motion.button>
-        <motion.button type="submit" whileTap={springPress} disabled={sending || !text.trim()} aria-label={t("Отправить сообщение")} className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-white hover:bg-accent-strong disabled:opacity-50"><Send size={15} /></motion.button>
+        <motion.button type="submit" whileTap={springPress} disabled={sending || !text.trim()} aria-label={t("Отправить сообщение")} className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-white shadow-[0_8px_20px_color-mix(in_srgb,var(--accent)_35%,transparent)] transition hover:bg-accent-strong disabled:opacity-50"><Send size={15} /></motion.button>
       </form>}
     </section>
   );
 }
+

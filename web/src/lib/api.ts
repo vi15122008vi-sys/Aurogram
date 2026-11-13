@@ -29,6 +29,8 @@ export interface ChannelRecord {
   subscribers: number;
   posts_count: number;
   scheduled_count?: number;
+  /** Просмотры последнего поста (бэкенд отдаёт, когда данные доступны). */
+  views?: number | null;
 }
 
 export interface BotRecord {

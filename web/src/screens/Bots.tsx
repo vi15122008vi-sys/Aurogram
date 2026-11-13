@@ -23,7 +23,7 @@ export function Bots({ bots, onOpen }: BotsProps) {
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
         {bots.map((bot) => (
           <button key={bot.id} type="button" onClick={() => onOpen?.(bot)} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left hover:bg-raised">
-            <Avatar name={bot.name} id={bot.id} className="size-10 border border-white/10" />
+            <Avatar name={bot.name} id={bot.id} className="size-10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--ink)_8%,transparent)]" />
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{bot.name}</span><span className="mt-1 block truncate font-mono text-xs text-muted">@{bot.username}</span></span>
             <span className={`size-2 rounded-full ${bot.webhookSet ? "bg-success" : "bg-muted/40"}`} aria-label={bot.webhookSet ? t("Webhook включён") : t("Webhook выключен")} />
             <ChevronRight size={15} className="text-muted" />
@@ -34,3 +34,4 @@ export function Bots({ bots, onOpen }: BotsProps) {
     </section>
   );
 }
+

@@ -33,9 +33,17 @@ export function ThemePicker({ selectedId, onSelect }: ThemePickerProps) {
               className={`overflow-hidden rounded-xl border text-left transition ${active ? "border-accent" : "border-line hover:border-muted"}`}
             >
               <span className="block p-3" style={{ backgroundColor: theme.colors.canvas }}>
-                <span className="flex h-16 items-end gap-1.5 rounded-lg border p-2" style={{ backgroundColor: theme.colors.surface, borderColor: theme.colors.line }}>
+                <span
+                  className="flex h-16 items-end gap-1.5 rounded-xl border p-2"
+                  style={{ background: `linear-gradient(145deg, ${theme.glass.fill}, ${theme.colors.surface})`, borderColor: theme.glass.border }}
+                >
                   <span className="h-7 w-2/3 rounded-lg" style={{ backgroundColor: theme.colors.raised }} />
-                  <span className="ml-auto h-5 w-1/4 rounded-lg" style={{ backgroundColor: theme.colors.accent }} />
+                  <span
+                    className="ml-auto grid h-6 w-1/3 place-items-center rounded-lg text-[9px] font-semibold"
+                    style={{ backgroundColor: theme.colors.accent, color: theme.glass.onAccent }}
+                  >
+                    Aa
+                  </span>
                 </span>
                 <span className="mt-2 flex gap-1.5">
                   {[theme.colors.accent, theme.colors.success, theme.colors.warning, theme.colors.ghost].map((color) => <span key={color} className="size-3 rounded-full" style={{ backgroundColor: color }} />)}

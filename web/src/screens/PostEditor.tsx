@@ -7,9 +7,11 @@ import { useI18n } from "../lib/i18n";
 interface PostEditorProps {
   channelId: number;
   onPublished?: () => void;
+  /** Режим «Отложить»: сразу фокусируем выбор времени публикации. */
+  focusSchedule?: boolean;
 }
 
-export function PostEditor({ channelId, onPublished }: PostEditorProps) {
+export function PostEditor({ channelId, onPublished, focusSchedule = false }: PostEditorProps) {
   const { t, locale } = useI18n();
   const [text, setText] = useState("");
   const [scheduleAt, setScheduleAt] = useState("");
@@ -20,6 +22,13 @@ export function PostEditor({ channelId, onPublished }: PostEditorProps) {
   const [premiumNotice, setPremiumNotice] = useState<string | null>(null);
   const [premium, setPremium] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const scheduleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!focusSchedule) return;
+    scheduleRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    scheduleRef.current?.focus();
+  }, [focusSchedule]);
 
   useEffect(() => {
     let mounted = true;
@@ -173,15 +182,15 @@ export function PostEditor({ channelId, onPublished }: PostEditorProps) {
         {premiumNotice && <div role="status" className="mx-3 mb-3 flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2.5 text-sm text-ink"><Sparkles size={16} className="mt-0.5 shrink-0 text-accent" /><span>{premiumNotice}</span></div>}
         {notice && <p role="status" className="mx-3 mb-3 rounded-lg border border-line bg-success/10 px-3 py-2 text-sm text-success">{notice}</p>}
         <div className="flex flex-col gap-3 border-t border-line p-3 sm:flex-row sm:items-center">
-          <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line px-3 text-xs text-muted">
+          <label className={`flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-surface/60 px-3.5 text-xs transition ${focusSchedule && !scheduleAt ? "text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_40%,transparent)]" : "text-muted"}`}>
             <Timer size={15} />
-            <input type="datetime-local" value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} className="min-w-0 flex-1 bg-transparent font-mono text-xs text-ink outline-none" aria-label={t("Время отложенной публикации")} />
+            <input ref={scheduleRef} type="datetime-local" value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} className="min-w-0 flex-1 bg-transparent font-mono text-xs text-ink outline-none" aria-label={t("Время отложенной публикации")} />
           </label>
           <div className="flex gap-2">
-            <button type="button" onClick={() => void publish(true)} disabled={busy || !text.trim() || !scheduleAt || text.length > 32768} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-line px-3 text-xs font-semibold text-ink transition hover:bg-raised disabled:opacity-50 sm:flex-none">
+            <button type="button" onClick={() => void publish(true)} disabled={busy || !text.trim() || !scheduleAt || text.length > 32768} className={`inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full px-3 text-xs font-semibold transition disabled:opacity-50 sm:flex-none ${focusSchedule && !scheduleAt ? "bg-accent/10 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent)]" : "bg-surface/60 text-ink hover:bg-accent/10 hover:text-accent"}`}>
               <Timer size={14} /> {t("Отложить")}
             </button>
-            <button type="submit" disabled={busy || !text.trim() || text.length > 32768} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-xs font-semibold text-white transition hover:bg-accent-strong disabled:opacity-50 sm:flex-none">
+            <button type="submit" disabled={busy || !text.trim() || text.length > 32768} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-accent px-4 text-xs font-semibold text-white transition hover:bg-accent-strong disabled:opacity-50 sm:flex-none">
               <Send size={14} /> {t("Опубликовать")}
             </button>
           </div>

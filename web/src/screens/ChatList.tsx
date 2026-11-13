@@ -25,6 +25,8 @@ const filters: { id: ChatFilter; label: string }[] = [
   { id: "archive", label: "Архив" },
 ];
 
+const chatTypeLabel = ({ user: "Личный чат", group: "Группа", channel: "Канал", bot: "Бот" } as const);
+
 function chatTime(value: string | null | undefined, locale: "ru" | "en"): string {
   if (!value) return "";
   const date = new Date(value);
@@ -35,6 +37,9 @@ function chatTime(value: string | null | undefined, locale: "ru" | "en"): string
     ? { timeStyle: "short" }
     : { month: "short", day: "numeric" }).format(date);
 }
+
+/* Разделитель строк — волосяная линия вместо border у ячейки. */
+const rowDivider = "after:pointer-events-none after:absolute after:inset-x-4 after:bottom-0 after:h-px after:bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] after:content-[''] last:after:hidden";
 
 export function ChatList({ chats, filter, archivingId, loading = false, error, onFilterChange, onOpen, onArchive }: ChatListProps) {
   const { t, locale } = useI18n();
@@ -119,11 +124,11 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
     <section className="animate-[rise-in_240ms_ease-out]">
       <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("INBOX")}</p>
       <div className="mt-2 flex items-end justify-between gap-3">
-        <h1 className="text-[28px] font-semibold text-ink">{t("Чаты")}</h1>
-        <span className="font-mono text-xs tabular-nums text-muted">{visibleChats.length}</span>
+        <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-ink">{t("Чаты")}</h1>
+        <span className="rounded-full bg-surface/60 px-2.5 py-1 font-mono text-[10px] tabular-nums text-muted">{visibleChats.length}</span>
       </div>
 
-      <label className="glass-panel mt-4 flex h-11 items-center gap-2 rounded-2xl px-3 text-muted">
+      <label className="glass-panel mt-4 flex h-11 items-center gap-2 rounded-[22px] px-3.5 text-muted focus-within:text-accent">
         <Search size={16} />
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Поиск чатов и сообщений")} aria-label={t("Поиск чатов и сообщений")} className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
       </label>
@@ -136,8 +141,8 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
         <div className="flex min-h-[76px] gap-3 overflow-x-auto pb-1">
           {stories.length ? stories.map((story) => (
             <div key={story.peer_id} className="flex w-[58px] shrink-0 flex-col items-center gap-1.5">
-              <span className={`size-[54px] rounded-full p-[2px] ${story.unread ? "bg-gradient-to-br from-fuchsia-500 via-accent to-amber-400" : "bg-line"}`}>
-                <Avatar name={story.title} id={story.peer_id} src={storyAvatarUrl(story.peer_id)} className="size-full border-2 border-canvas" />
+              <span className={`size-[54px] rounded-full p-[2px] ${story.unread ? "bg-gradient-to-br from-fuchsia-500 via-accent to-amber-400" : "bg-[color-mix(in_srgb,var(--ink)_8%,transparent)]"}`}>
+                <Avatar name={story.title} id={story.peer_id} src={storyAvatarUrl(story.peer_id)} className="size-full" />
               </span>
               <span className="w-full truncate text-center text-[10px] text-muted">{story.title}</span>
             </div>
@@ -148,13 +153,13 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
       {query.trim().length >= 2 ? (
         <div className="mt-4 space-y-4">
           {searching && <p className="text-xs text-muted">{t("Ищем в кэше…")}</p>}
-          {!!searchResults?.chats.length && <section><h2 className="mb-2 text-xs font-semibold text-muted">{t("Чаты")}</h2><div className="glass-panel overflow-hidden rounded-2xl">{searchResults.chats.map((chat) => <button key={chat.id} type="button" onClick={() => onOpen?.({ ...chat, archived: false, last_message: null })} className="flex w-full items-center gap-3 border-b border-line p-3 text-left last:border-0 hover:bg-raised/60"><span className="grid size-9 place-items-center rounded-full bg-accent/15 text-sm font-semibold text-accent">{chat.title.slice(0, 1)}</span><span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{chat.title}</span>{chat.username && <span className="text-xs text-muted">@{chat.username}</span>}</button>)}</div></section>}
-          {!!searchResults?.messages.length && <section><h2 className="mb-2 text-xs font-semibold text-muted">{t("Сообщения")}</h2><div className="glass-panel overflow-hidden rounded-2xl">{searchResults.messages.map((message) => <button key={`${message.chat_id}:${message.message_id}`} type="button" onClick={() => onOpen?.({ id: message.chat_id, title: message.chat_title || String(message.chat_id), type: message.chat_type || "user", archived: false, unread: 0, last_message: message.text, last_message_date: message.date })} className="block w-full border-b border-line p-3 text-left last:border-0 hover:bg-raised/60"><span className="block truncate text-xs font-semibold text-accent">{message.chat_title || t("Чат")}</span><span className="mt-1 block line-clamp-2 text-sm text-ink">{message.text}</span></button>)}</div></section>}
+          {!!searchResults?.chats.length && <section><h2 className="mb-2 text-xs font-semibold text-muted">{t("Чаты")}</h2><div className="glass-panel overflow-hidden rounded-[24px] p-1">{searchResults.chats.map((chat) => <button key={chat.id} type="button" onClick={() => onOpen?.({ ...chat, archived: false, last_message: null })} className={`relative flex w-full items-center gap-3 rounded-[20px] p-2.5 text-left transition hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] ${rowDivider}`}><span className="grid size-9 place-items-center rounded-full bg-accent/15 text-sm font-semibold text-accent">{chat.title.slice(0, 1)}</span><span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{chat.title}</span>{chat.username && <span className="text-xs text-muted">@{chat.username}</span>}</button>)}</div></section>}
+          {!!searchResults?.messages.length && <section><h2 className="mb-2 text-xs font-semibold text-muted">{t("Сообщения")}</h2><div className="glass-panel overflow-hidden rounded-[24px] p-1">{searchResults.messages.map((message) => <button key={`${message.chat_id}:${message.message_id}`} type="button" onClick={() => onOpen?.({ id: message.chat_id, title: message.chat_title || String(message.chat_id), type: message.chat_type || "user", archived: false, unread: 0, last_message: message.text, last_message_date: message.date })} className={`relative block w-full rounded-[20px] p-3 text-left transition hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] ${rowDivider}`}><span className="block truncate text-xs font-semibold text-accent">{message.chat_title || t("Чат")}</span><span className="mt-1 block line-clamp-2 text-sm text-ink">{message.text}</span></button>)}</div></section>}
           {!searching && searchResults && !searchResults.chats.length && !searchResults.messages.length && <p className="py-8 text-center text-sm text-muted">{t("Ничего не найдено в кэше")}</p>}
           {!searchResults && !searching && <p className="py-8 text-center text-xs text-muted">{t("Введите не менее двух символов")}</p>}
         </div>
       ) : <>
-      <div role="tablist" aria-label={t("Фильтр чатов")} className="glass-panel mt-5 flex w-full gap-1 overflow-x-auto rounded-xl p-1">
+      <div role="tablist" aria-label={t("Фильтр чатов")} className="glass-panel mt-5 flex w-full gap-1 overflow-x-auto rounded-[22px] p-1.5">
         {filters.map(({ id, label }) => (
           <button
             key={id}
@@ -162,7 +167,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
             role="tab"
             aria-selected={filter === id}
             onClick={() => { setMenuChatId(null); onFilterChange(id); }}
-            className={`shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition ${filter === id ? "bg-accent/15 text-accent shadow-[0_0_18px_rgb(99_102_241_/_12%)]" : "text-muted hover:bg-white/[0.04] hover:text-ink"}`}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${filter === id ? "bg-accent/10 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_16%,transparent)]" : "text-muted hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] hover:text-ink"}`}
           >
             {t(label)}
           </button>
@@ -170,28 +175,34 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
       </div>
 
       <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1" aria-label={t("Папки чатов")}>
-        <button type="button" aria-pressed={selectedFolderId === null} onClick={() => setSelectedFolderId(null)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${selectedFolderId === null ? "border-accent/30 bg-accent/10 text-accent" : "border-line text-muted hover:text-ink"}`}>{t("Все папки")}</button>
-        {folders.map((folder) => <button key={folder.id} type="button" aria-pressed={selectedFolderId === folder.id} onClick={() => setSelectedFolderId(folder.id)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${selectedFolderId === folder.id ? "border-accent/30 bg-accent/10 text-accent" : "border-line text-muted hover:text-ink"}`}>{folder.name}<span className="ml-1.5 font-mono opacity-70">{folder.chat_ids.length}</span></button>)}
-        <button type="button" onClick={() => setCreatingFolder((open) => !open)} className="grid size-8 shrink-0 place-items-center rounded-full border border-line text-muted hover:border-accent/30 hover:text-accent" aria-label={t("Создать папку")}><FolderPlus size={15} /></button>
+        <button type="button" aria-pressed={selectedFolderId === null} onClick={() => setSelectedFolderId(null)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs transition ${selectedFolderId === null ? "bg-accent/10 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_16%,transparent)]" : "bg-surface/50 text-muted hover:text-ink"}`}>{t("Все папки")}</button>
+        {folders.map((folder) => <button key={folder.id} type="button" aria-pressed={selectedFolderId === folder.id} onClick={() => setSelectedFolderId(folder.id)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs transition ${selectedFolderId === folder.id ? "bg-accent/10 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_16%,transparent)]" : "bg-surface/50 text-muted hover:text-ink"}`}>{folder.name}<span className="ml-1.5 font-mono opacity-70">{folder.chat_ids.length}</span></button>)}
+        <button type="button" onClick={() => setCreatingFolder((open) => !open)} className="grid size-8 shrink-0 place-items-center rounded-full bg-surface/50 text-muted transition hover:text-accent" aria-label={t("Создать папку")}><FolderPlus size={15} /></button>
       </div>
-      {creatingFolder && <form onSubmit={createFolder} className="mt-2 flex max-w-sm gap-2"><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} maxLength={32} placeholder={t("Название папки")} className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-xs text-ink outline-none focus:border-accent" /><button type="submit" disabled={!folderName.trim()} className="rounded-xl bg-accent px-3 text-xs font-medium text-white disabled:opacity-50">{t("Создать")}</button></form>}
+      {creatingFolder && <form onSubmit={createFolder} className="mt-2 flex max-w-sm gap-2"><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} maxLength={32} placeholder={t("Название папки")} className="h-9 min-w-0 flex-1 rounded-[16px] bg-surface/60 px-3 text-xs text-ink outline-none placeholder:text-muted focus:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_35%,transparent)]" /><button type="submit" disabled={!folderName.trim()} className="rounded-[16px] bg-accent px-3 text-xs font-medium text-white disabled:opacity-50">{t("Создать")}</button></form>}
       {folderError && <p role="alert" className="mt-2 text-xs text-danger">{folderError}</p>}
 
-      {error && <p role="alert" className="mt-3 rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && <p role="alert" className="mt-3 rounded-[18px] bg-danger/10 px-3 py-2 text-sm text-danger shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--danger)_18%,transparent)]">{error}</p>}
 
-      <div className="glass-panel mt-3 overflow-visible rounded-2xl">
+      <div className="glass-panel mt-3 overflow-visible rounded-[26px] p-1">
         {visibleChats.map((chat) => (
-          <article key={chat.id} className="chat-row group relative flex items-center gap-2 border-b border-white/[0.055] px-2.5 py-2 last:border-0 sm:px-3">
-            <button type="button" onClick={() => onOpen?.(chat)} className="glass-hover flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 text-left transition duration-200">
-              <Avatar name={chat.title} id={chat.id} src={chatAvatarUrl(chat.id)} className="size-11 border border-white/10 shadow-[0_3px_12px_rgb(0_0_0_/_16%)]" />
+          <article key={chat.id} className={`group relative flex items-center gap-1 px-0.5 ${rowDivider}`}>
+            <button type="button" onClick={() => onOpen?.(chat)} className="glass-hover flex min-w-0 flex-1 items-center gap-3 rounded-[20px] p-2 text-left transition duration-200 hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)]">
+              <Avatar name={chat.title} id={chat.id} src={chatAvatarUrl(chat.id)} className="size-12 shrink-0 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_8%),0_8px_20px_rgb(0_0_0_/_18%)]" />
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="block truncate text-sm font-semibold text-ink">{chat.title}</span>
-                  {chat.unread > 0 && <span className="rounded-md bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] text-accent">{chat.unread}</span>}
+                <span className="flex items-baseline gap-2">
+                  <span className={`min-w-0 flex-1 truncate text-[14px] ${chat.unread > 0 ? "font-semibold text-ink" : "font-medium text-ink/90"}`}>{chat.title}</span>
+                  <time className={`shrink-0 font-mono text-[10px] tabular-nums ${chat.unread > 0 ? "text-accent" : "text-muted"}`}>{chatTime(chat.last_message_date, locale)}</time>
                 </span>
-                <span className="mt-1 block truncate text-xs text-muted">{chat.last_message || t(({ user: "Личный чат", group: "Группа", channel: "Канал", bot: "Бот" } as const)[chat.type])}</span>
+                <span className="mt-1 flex items-center gap-2">
+                  <span className={`min-w-0 flex-1 truncate text-xs ${chat.unread > 0 ? "text-ink/75" : "text-muted"}`}>{chat.last_message || t(chatTypeLabel[chat.type])}</span>
+                  {chat.unread > 0 && (
+                    <span className="grid min-w-[20px] shrink-0 place-items-center rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--accent)_35%,transparent)]">
+                      {chat.unread > 99 ? "99+" : chat.unread}
+                    </span>
+                  )}
+                </span>
               </span>
-              <time className="shrink-0 font-mono text-[10px] tabular-nums text-muted">{chatTime(chat.last_message_date, locale)}</time>
             </button>
 
             <div className="relative shrink-0">
@@ -202,23 +213,23 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
                 aria-expanded={menuChatId === chat.id}
                 disabled={archivingId === chat.id}
                 onClick={() => setMenuChatId((current) => current === chat.id ? null : chat.id)}
-                className="grid size-9 place-items-center rounded-lg text-muted transition hover:bg-white/[0.06] hover:text-ink disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                className="grid size-9 place-items-center rounded-full text-muted transition hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] hover:text-ink disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
               >
                 <MoreHorizontal size={18} />
               </button>
               {menuChatId === chat.id && (
-                <div role="menu" className="glass-panel absolute right-0 top-10 z-20 min-w-44 rounded-xl p-1.5 shadow-2xl">
+                <div role="menu" className="glass-panel absolute right-0 top-11 z-20 min-w-44 rounded-[22px] p-1.5 shadow-2xl">
                   <button
                     type="button"
                     role="menuitem"
                     disabled={archivingId === chat.id}
                     onClick={() => { setMenuChatId(null); onArchive?.(chat); }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-ink transition hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                    className="flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-left text-xs text-ink transition hover:bg-accent/10 hover:text-accent disabled:opacity-50"
                   >
                     {filter === "archive" ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                     {t(filter === "archive" ? "Убрать из архива" : "В архив")}
                   </button>
-                  {folders.length > 0 && <div className="mt-1 border-t border-line pt-1"><p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-muted">{t("Папка")}</p>{folders.map((folder) => <button key={folder.id} type="button" role="menuitem" onClick={() => void assignFolder(chat, folder.id)} className="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs text-ink hover:bg-accent/10">{folder.chat_ids.includes(chat.id) ? "✓ " : "  "}{folder.name}</button>)}{folders.some((folder) => folder.chat_ids.includes(chat.id)) && <button type="button" role="menuitem" onClick={() => void assignFolder(chat, null)} className="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs text-muted hover:bg-raised">{t("Убрать из папки")}</button>}</div>}
+                  {folders.length > 0 && <div className="mt-1 pt-1"><div className="glass-divider mx-2" aria-hidden="true" /><p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-muted">{t("Папка")}</p>{folders.map((folder) => <button key={folder.id} type="button" role="menuitem" onClick={() => void assignFolder(chat, folder.id)} className="flex w-full items-center rounded-[14px] px-3 py-2 text-left text-xs text-ink hover:bg-accent/10">{folder.chat_ids.includes(chat.id) ? "✓ " : "  "}{folder.name}</button>)}{folders.some((folder) => folder.chat_ids.includes(chat.id)) && <button type="button" role="menuitem" onClick={() => void assignFolder(chat, null)} className="flex w-full items-center rounded-[14px] px-3 py-2 text-left text-xs text-muted hover:bg-raised">{t("Убрать из папки")}</button>}</div>}
                 </div>
               )}
             </div>
@@ -230,3 +241,4 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
     </section>
   );
 }
+

@@ -127,6 +127,9 @@ class ChannelOut(BaseModel):
     posts_count: int = 0
     scheduled_count: int = 0
     last_post_at: Optional[datetime] = None
+    # Просмотры последнего поста: 0, если Telegram не отдал метрику
+    # (например, для приватных каналов или сервисных сообщений).
+    views: int = 0
 
 
 class BotOut(BaseModel):
