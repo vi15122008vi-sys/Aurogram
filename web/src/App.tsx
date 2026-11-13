@@ -150,7 +150,7 @@ export default function App() {
   if (account) {
     return (
       <Layout accountName={account.name || account.phone} activeTab={activeTab} onTabChange={setActiveTab} onLogout={logout} error={error}>
-        <Workspace tab={activeTab} account={account} onLogout={logout} onTabChange={setActiveTab} />
+        <Workspace tab={activeTab} account={account} onLogout={logout} />
       </Layout>
     );
   }

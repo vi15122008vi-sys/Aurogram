@@ -14,6 +14,8 @@ type StudioSection = "widgets" | "stickers" | "media" | "scheduled";
 interface ChannelStudioProps {
   channelId: number;
   channelTitle: string;
+  /** Раздел, который открывается сразу (из FAB или шапки канала). */
+  initialSection?: StudioSection;
 }
 
 const sections: { id: StudioSection; title: string; titleEn: string; hint: string; hintEn: string; icon: typeof Gamepad2; badge?: string }[] = [
@@ -23,9 +25,9 @@ const sections: { id: StudioSection; title: string; titleEn: string; hint: strin
   { id: "scheduled", title: "Отложенные посты", titleEn: "Scheduled posts", hint: "Календарь публикаций", hintEn: "Publishing calendar", icon: CalendarClock },
 ];
 
-export function ChannelStudio({ channelId, channelTitle }: ChannelStudioProps) {
+export function ChannelStudio({ channelId, channelTitle, initialSection = "widgets" }: ChannelStudioProps) {
   const { t, locale } = useI18n();
-  const [section, setSection] = useState<StudioSection>("widgets");
+  const [section, setSection] = useState<StudioSection>(initialSection);
   const [category, setCategory] = useState<WidgetCategory | "all">("all");
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<StudioWidget | null>(null);

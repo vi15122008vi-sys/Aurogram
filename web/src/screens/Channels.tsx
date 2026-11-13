@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowRight, ChartNoAxesColumn, Eye, MessageCircle, Radio, RefreshCw, Search, Send, Timer, Users, X } from "lucide-react";
+import { ArrowRight, ChartNoAxesColumn, Eye, Gamepad2, Radio, RefreshCw, Search, Send, Sticker, Timer, Users, X } from "lucide-react";
 import { api, type ChannelRecord } from "../lib/api";
 import { Avatar } from "../components/Avatar";
+import { Fab } from "../components/Fab";
+import { StudioModal, type StudioSection } from "../components/StudioModal";
 import { useI18n } from "../lib/i18n";
 
 interface ChannelsProps {
-  onSendDirect?: () => void;
   onOpen: (channel: ChannelRecord) => void;
   onPublish?: (channel: ChannelRecord) => void;
   onSchedule?: (channel: ChannelRecord) => void;
   onStatistics?: (channel: ChannelRecord) => void;
 }
 
-export function Channels({ onOpen, onPublish, onSchedule, onStatistics, onSendDirect }: ChannelsProps) {
+export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: ChannelsProps) {
   const { t, locale } = useI18n();
   const [listView, setListView] = useState<"channels" | "mine">("channels");
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
@@ -20,7 +21,9 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics, onSendDi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [studioSection, setStudioSection] = useState<StudioSection>("widgets");
 
   const number = useMemo(
     () => new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US"),
@@ -105,9 +108,6 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics, onSendDi
           <h2 className="text-[15px] font-semibold text-ink">{t("Мои каналы")}</h2>
           <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t("Под управлением", "Managed")} · {channels.length}</p>
         </div>
-        <button type="button" onClick={() => setComposerOpen(true)} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-accent px-4 text-xs font-semibold text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--accent)_30%,transparent)] transition hover:bg-accent-strong">
-          <Send size={14} />{t("Создать")}
-        </button>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -187,36 +187,55 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics, onSendDi
           </div>
         </div>
       )}
-      {composerOpen && (
-        <div role="dialog" aria-modal="true" aria-label={t("Создать")} className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-md" onClick={() => setComposerOpen(false)}>
-          <div className="glass-modal w-full max-w-sm p-4" onClick={(event) => event.stopPropagation()}>
+      <Fab onClick={() => setSheetOpen(true)} label={t("Создать", "Create")} />
+
+      {sheetOpen && (
+        <div role="dialog" aria-modal="true" aria-label={t("Создать")} className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-md sm:items-center" onClick={() => setSheetOpen(false)}>
+          <div className="glass-modal w-full max-w-md p-4" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-ink">{t("Создать")}</h2>
-                <p className="mt-1 text-[11px] leading-4 text-muted">{t("Опубликуйте пост в канал или отправьте сообщение в личные.", "Publish to a channel or send a direct message.")}</p>
+                <p className="mt-1 text-[11px] leading-4 text-muted">{channels[0]?.title ?? t("Сначала добавьте канал", "Add a channel first")}</p>
               </div>
-              <button type="button" onClick={() => setComposerOpen(false)} aria-label={t("Закрыть")} className="grid size-8 shrink-0 place-items-center rounded-full bg-surface/60 text-muted transition hover:text-ink">
+              <button type="button" onClick={() => setSheetOpen(false)} aria-label={t("Закрыть")} className="grid size-8 shrink-0 place-items-center rounded-full bg-surface/60 text-muted transition hover:text-ink">
                 <X size={14} />
               </button>
             </div>
             <div className="mt-4 grid gap-2">
-              <button type="button" disabled={!channels.length} onClick={() => { setComposerOpen(false); if (channels[0]) onPublish?.(channels[0]); }} className="flex items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10 disabled:opacity-50">
+              <button type="button" disabled={!channels.length} onClick={() => { setSheetOpen(false); if (channels[0]) onPublish?.(channels[0]); }} className="flex items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10 disabled:opacity-50">
                 <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><Send size={15} /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-ink">{t("Опубликовать в канал")}</span>
-                  <span className="block truncate text-[11px] text-muted">{channels[0]?.title ?? t("Сначала добавьте канал", "Add a channel first")}</span>
+                  <span className="block text-sm font-medium text-ink">{t("Написать пост")}</span>
+                  <span className="block text-[11px] text-muted">{t("Откроет редактор канала", "Opens the channel editor")}</span>
                 </span>
               </button>
-              <button type="button" onClick={() => { setComposerOpen(false); onSendDirect?.(); }} className="flex items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10">
-                <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><MessageCircle size={15} /></span>
+              <button type="button" disabled={!channels.length} onClick={() => { setSheetOpen(false); setStudioSection("widgets"); setStudioOpen(true); }} className="flex items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10 disabled:opacity-50">
+                <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><Gamepad2 size={15} /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-ink">{t("Отправить в личные сообщения")}</span>
-                  <span className="block text-[11px] text-muted">{t("Откроет список личных чатов", "Opens your direct chats")}</span>
+                  <span className="block text-sm font-medium text-ink">{t("Создать виджет")}</span>
+                  <span className="block text-[11px] text-muted">{t("Галерея HTML-игр и опросов", "HTML games and polls gallery")}</span>
+                </span>
+              </button>
+              <button type="button" disabled={!channels.length} onClick={() => { setSheetOpen(false); setStudioSection("stickers"); setStudioOpen(true); }} className="flex items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10 disabled:opacity-50">
+                <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><Sticker size={15} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-ink">{t("Создать стикерпак")}</span>
+                  <span className="block text-[11px] text-muted">{t("Стикер-студия канала", "Channel sticker studio")}</span>
                 </span>
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {channels[0] && (
+        <StudioModal
+          open={studioOpen}
+          onClose={() => setStudioOpen(false)}
+          channelId={channels[0].id}
+          channelTitle={channels[0].title}
+          initialSection={studioSection}
+        />
       )}
     </section>
   );

@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChartNoAxesColumn, LayoutGrid, MessageSquareText, Plug, Radio, Settings2, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, ChartNoAxesColumn, MessageSquareText, Radio, Settings2, Users, Wrench } from "lucide-react";
 import { api, type ChannelDetails, type ChannelRecord } from "../lib/api";
-import { AntispamScreen } from "./AntispamScreen";
-import { ChannelStudio } from "./ChannelStudio";
-import { IntegrationsPanel } from "./IntegrationsPanel";
+import { StudioModal } from "../components/StudioModal";
 import { MessageList } from "./MessageList";
 import { PostEditor } from "./PostEditor";
 import { useI18n } from "../lib/i18n";
 
-type ChannelTab = "posts" | "studio" | "stats" | "integrations" | "antispam" | "settings";
+type ChannelTab = "posts" | "stats" | "settings";
 
 interface ChannelDetailProps {
   channel: ChannelRecord;
@@ -20,19 +18,18 @@ interface ChannelDetailProps {
 
 const tabs: { id: ChannelTab; label: string; icon: typeof Radio }[] = [
   { id: "posts", label: "Посты", icon: MessageSquareText },
-  { id: "studio", label: "Студия", icon: LayoutGrid },
   { id: "stats", label: "Статистика", icon: ChartNoAxesColumn },
-  { id: "integrations", label: "Интеграции", icon: Plug },
-  { id: "antispam", label: "Антиспам", icon: ShieldCheck },
   { id: "settings", label: "Настройки", icon: Settings2 },
 ];
 
 export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSchedule = false }: ChannelDetailProps) {
   const { t, locale } = useI18n();
-  const [active, setActive] = useState<ChannelTab>(initialTab);
+  // «Студия» больше не вкладка — из неё ведёт кнопка в шапке.
+  const [active, setActive] = useState<ChannelTab>(initialTab === "studio" ? "posts" : initialTab);
   const [details, setDetails] = useState<ChannelDetails | null>(null);
   const [metrics, setMetrics] = useState<{ deleted: number; mutes: number; bans: number } | null>(null);
   const [postsReloadKey, setPostsReloadKey] = useState(0);
+  const [studioOpen, setStudioOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,7 +66,14 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
           <h1 className="mt-1 truncate text-[25px] font-semibold">{title}</h1>
           <p className="mt-1 truncate text-sm text-muted">{username ? `@${username}` : t("Канал")}</p>
         </div>
-        <span className="hidden items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-muted sm:inline-flex"><Users size={14} />{subscribers.toLocaleString("ru-RU")}</span>
+        <button
+          type="button"
+          onClick={() => setStudioOpen(true)}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-accent/10 px-3 text-xs font-medium text-accent transition hover:bg-accent/20"
+        >
+          <Wrench size={14} />{t("Студия")}
+        </button>
+        <span className="hidden items-center gap-1.5 rounded-lg bg-surface/60 px-3 py-2 font-mono text-xs text-muted sm:inline-flex"><Users size={14} />{subscribers.toLocaleString("ru-RU")}</span>
       </div>
 
       <div role="tablist" aria-label={t("Раздел канала")} className="mt-6 flex gap-1 overflow-x-auto border-b border-line">
@@ -83,15 +87,12 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
       {error && <p role="alert" className="mt-4 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       <div className="mt-5">
         {active === "posts" && <div className="space-y-5"><PostEditor channelId={channel.id} focusSchedule={initialSchedule} onPublished={() => setPostsReloadKey((key) => key + 1)} /><div><h2 className="mb-3 text-sm font-semibold">{t("Последние публикации")}</h2><MessageList key={`${channel.id}:${postsReloadKey}`} chatId={channel.id} pageSize={20} /></div></div>}
-        {active === "studio" && <ChannelStudio channelId={channel.id} channelTitle={title} />}
         {active === "stats" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label={t("Подписчики")} value={subscribers.toLocaleString(locale === "ru" ? "ru-RU" : "en-US")} />
           <Stat label={t("Удалено за 24 часа")} value={metrics?.deleted.toLocaleString(locale === "ru" ? "ru-RU" : "en-US") ?? "—"} />
           <Stat label={t("Муты / баны")} value={metrics ? `${metrics.mutes} / ${metrics.bans}` : "—"} />
           <Stat label={t("Чат обсуждений")} value={details?.linked_chat_id ? t("Привязан") : t("Не привязан")} />
         </div>}
-        {active === "integrations" && <IntegrationsPanel channelId={channel.id} />}
-        {active === "antispam" && <AntispamScreen channelId={channel.id} />}
         {active === "settings" && <dl className="max-w-3xl divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
           <Info label={t("Название")} value={title} />
           <Info label="Username" value={username ? `@${username}` : t("Не задан")} />
@@ -99,6 +100,7 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
           <Info label={t("Чат обсуждений")} value={details?.linked_chat_id ? String(details.linked_chat_id) : t("Не привязан")} mono />
         </dl>}
       </div>
+      <StudioModal open={studioOpen} onClose={() => setStudioOpen(false)} channelId={channel.id} channelTitle={title} />
     </section>
   );
 }

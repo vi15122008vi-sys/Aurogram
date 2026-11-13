@@ -14,7 +14,6 @@ interface WorkspaceProps {
   tab: AppTab;
   account: AuthAccount;
   onLogout: () => void;
-  onTabChange?: (tab: AppTab) => void;
 }
 
 type Row = BotRecord | ChatRecord;
@@ -36,7 +35,7 @@ function itemMeta(item: Row, tab: AppTab): string {
   return "";
 }
 
-export function Workspace({ tab, account, onLogout, onTabChange }: WorkspaceProps) {
+export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   const { t } = useI18n();
   const [rows, setRows] = useState<Row[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<{ id: number; title: string; username: string | null; subscribers: number; posts_count: number } | null>(null);
@@ -114,7 +113,6 @@ export function Workspace({ tab, account, onLogout, onTabChange }: WorkspaceProp
           onPublish={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(false); }}
           onSchedule={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(true); }}
           onStatistics={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("stats"); setScheduleFocus(false); }}
-          onSendDirect={() => onTabChange?.("chats")}
         />;
   }
 

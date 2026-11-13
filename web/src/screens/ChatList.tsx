@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, FolderPlus, MoreHorizontal, Phone, Search } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Archive, ArchiveRestore, FolderPlus, MessageCircle, MoreHorizontal, Phone, Search, X } from "lucide-react";
 import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
 import { Avatar } from "../components/Avatar";
+import { Fab } from "../components/Fab";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { Skeleton } from "../components/Skeleton";
 import { openCall } from "../lib/callbus";
@@ -53,6 +54,8 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<GlobalSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [folders, setFolders] = useState<ChatFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -153,7 +156,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
 
       <label className="glass-panel mt-4 flex h-11 items-center gap-2 rounded-[22px] px-3.5 text-muted focus-within:text-accent">
         <Search size={16} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Поиск чатов и сообщений")} aria-label={t("Поиск чатов и сообщений")} className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
+        <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Поиск чатов и сообщений")} aria-label={t("Поиск чатов и сообщений")} className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted" />
       </label>
 
       <div className="mt-5" aria-label={t("Истории")}>
@@ -309,6 +312,49 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
       </div>
       )}
       </>
+      <Fab
+        label={t("Написать сообщение", "Write a message")}
+        onClick={() => setComposeOpen(true)}
+      />
+
+      {composeOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("Новое сообщение", "New message")}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-md sm:items-center"
+          onClick={() => setComposeOpen(false)}
+        >
+          <div className="glass-modal w-full max-w-md p-4" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-ink">{t("Новое сообщение", "New message")}</h2>
+                <p className="mt-1 text-[11px] leading-4 text-muted">{t("Выберите контакт или группу из списка", "Pick a contact or group from the list")}</p>
+              </div>
+              <button type="button" onClick={() => setComposeOpen(false)} aria-label={t("Закрыть")} className="grid size-8 shrink-0 place-items-center rounded-full bg-surface/60 text-muted transition hover:text-ink">
+                <X size={14} />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setComposeOpen(false);
+                requestAnimationFrame(() => {
+                  searchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+                  searchRef.current?.focus();
+                });
+              }}
+              className="mt-4 flex w-full items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10"
+            >
+              <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><MessageCircle size={15} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-ink">{t("Написать сообщение")}</span>
+                <span className="block text-[11px] text-muted">{t("Поиск контактов и чатов", "Search contacts and chats")}</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { Bot, LayoutGrid, MessageCircle, Settings2 } from "lucide-react";
+import { Bot, MessageCircle, Rss, Settings2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { springPress } from "../lib/motion";
@@ -12,9 +12,9 @@ interface BottomNavProps {
 
 /* Тонкие иконки Lucide (stroke 1.4) вместо плотных заливок. */
 const items = [
-  { id: "channels", label: "Студия", icon: LayoutGrid },
-  { id: "bots", label: "Боты", icon: Bot },
   { id: "chats", label: "Чаты", icon: MessageCircle },
+  { id: "channels", label: "Каналы", icon: Rss },
+  { id: "bots", label: "Боты", icon: Bot },
   { id: "settings", label: "Настройки", icon: Settings2 },
 ] as const;
 
