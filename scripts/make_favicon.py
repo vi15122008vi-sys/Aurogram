@@ -61,9 +61,10 @@ def main() -> None:
 
     icon_path = r"C:\Users\vi151\OneDrive\Desktop\Aurogram\web\public\favicon.ico"
     logo.save(icon_path, format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-    logo.resize((256, 256), Image.LANCZOS).save(icon_path.replace(".ico", "-256.png"))
+    logo.resize((256, 256), Image.LANCZOS).save(r"C:\Users\vi151\OneDrive\Desktop\Aurogram\scripts\logo-preview.png")
     print("saved", icon_path)
 
 
 if __name__ == "__main__":
     main()
+

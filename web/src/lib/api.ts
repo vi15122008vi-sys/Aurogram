@@ -206,7 +206,23 @@ export class ApiError extends Error {
 // this with VITE_API_BASE_URL=/api to use the Vite dev-server proxy.
 const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
 const apiBase = (configuredApiBase || "https://aurogram.dpdns.org").replace(/\/+$/, "");
-let bearerToken: string | null = null;
+
+/**
+ * Токен сессии храним сами: cookie с домена API для страницы на pages.dev —
+ * сторонняя, и браузеры (Safari, Chrome, Brave) её блокируют. Bearer-токен
+ * работает на любом origin.
+ */
+const AUTH_TOKEN_KEY = "aurogram.auth_token";
+
+function readStoredToken(): string | null {
+  try {
+    return window.localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+let bearerToken: string | null = readStoredToken();
 
 function apiUrl(path: string): string {
   const normalizedPath = path.startsWith("/api/") ? path : `/api${path.startsWith("/") ? path : `/${path}`}`;
@@ -218,6 +234,12 @@ function apiUrl(path: string): string {
 
 export function setBearerToken(token: string | null): void {
   bearerToken = token;
+  try {
+    if (token) window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    // Приватный режим: токен живёт только в памяти вкладки.
+  }
 }
 
 export function storyAvatarUrl(peerId: number): string {
@@ -266,7 +288,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       credentials: "include",
     });
   } catch {
-    throw new ApiError("Не удалось связаться с сервером. Проверьте подключение и настройки API.", 0);
+    throw new ApiError(
+      "Не удалось связаться с сервером. Проверьте подключение, VPN или блокировку запросов браузером (CORS).",
+      0,
+    );
   }
   let body: any;
   if (response.status !== 204) {
@@ -280,8 +305,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
+    // Просроченный или отозванный токен не должен залипать в localStorage.
+    if (response.status === 401) setBearerToken(null);
     throw new ApiError(translateApiMessage(readableApiError(body?.detail, response.status)), response.status);
   }
+
+  // Сервер отдаёт токен в теле — запоминаем его для Authorization: Bearer.
+  const issuedToken = body && typeof body.token === "string" ? body.token : null;
+  if (issuedToken) setBearerToken(issuedToken);
+
   return body as T;
 }
 

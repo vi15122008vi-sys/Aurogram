@@ -8,7 +8,7 @@ import { Code } from "./screens/Code";
 import { PhoneInput } from "./screens/PhoneInput";
 import { TwoFactor } from "./screens/TwoFactor";
 import { Workspace } from "./screens/Workspace";
-import { ApiError, api, type AuthAccount, type SendCodeResult } from "./lib/api";
+import { ApiError, api, setBearerToken, type AuthAccount, type SendCodeResult } from "./lib/api";
 import { applyTheme, themeList, type ThemeId } from "./lib/themes";
 import { useI18n } from "./lib/i18n";
 import { springModal } from "./lib/motion";
@@ -130,9 +130,12 @@ export default function App() {
     try {
       await api.auth.logout();
     } catch (cause) {
+      // Даже если сеть отвалилась, локальный токен всё равно сбрасываем.
+      setBearerToken(null);
       setError(cause instanceof Error ? t(cause.message) : t("Не удалось выйти из аккаунта"));
       return;
     }
+    setBearerToken(null);
     setAccount(null);
     setPending(null);
     setCode("");

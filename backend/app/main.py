@@ -80,8 +80,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=list(dict.fromkeys([
         *settings.cors_origin_list(),
+        # Прод-домен API и страница админки — один origin, первый запрос с него тоже CORS.
+        "https://aurogram.dpdns.org",
+        # Веб-приложение на Pages: отдельный origin, ходит с Bearer-токеном.
         "https://aurogram.pages.dev",
         "http://localhost:5173",
+        "http://localhost:4173",
     ])),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

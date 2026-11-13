@@ -42,6 +42,21 @@ def _without_token(result: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in result.items() if key != "token"}
 
 
+def _auth_payload(result: dict[str, Any]) -> dict[str, Any]:
+    """Отдаём токен и в теле ответа.
+
+    Cookie живёт на домене API; для веб-приложения на другом домене
+    (aurogram.pages.dev → aurogram.dpdns.org) это сторонняя cookie,
+    которую Safari/Chrome/Brave блокируют. Тогда клиент сохраняет токен
+    и ходит с `Authorization: Bearer`, не завися от политики cookie.
+    """
+    payload = dict(result)
+    token = payload.get("token")
+    if isinstance(token, str) and token:
+        payload["token"] = token
+    return payload
+
+
 @router.get("/countries")
 async def countries() -> list[dict[str, Any]]:
     return [country.model_dump() for country in telegram_auth.list_countries()]
@@ -55,7 +70,7 @@ async def register_key(
 ) -> dict[str, Any]:
     result = await telegram_auth.register_key(payload.api_id, payload.api_hash)
     _set_auth_cookie(response, request, result.get("token"))
-    return _without_token(result)
+    return _auth_payload(result)
 
 
 @router.post("/send-code", dependencies=[Depends(limit_requests(SEND_CODE_LIMITER, "auth.send_code"))])
@@ -75,7 +90,7 @@ async def send_code(
         device_id=request.headers.get("x-device-id", "default"),
     )
     _set_auth_cookie(response, request, result.get("token"))
-    return _without_token(result)
+    return _auth_payload(result)
 
 
 @router.post("/sign-in", dependencies=[Depends(limit_requests(SIGN_IN_LIMITER, "auth.sign_in"))])
@@ -97,7 +112,7 @@ async def sign_in(
         device_id=request.headers.get("x-device-id", "default"),
     )
     _set_auth_cookie(response, request, result.get("token"))
-    return _without_token(result)
+    return _auth_payload(result)
 
 
 @router.post("/qr", dependencies=[Depends(limit_requests(QR_LIMITER, "auth.qr"))])
@@ -108,7 +123,7 @@ async def start_qr(
 ) -> dict[str, Any]:
     result = await telegram_auth.start_qr(account)
     _set_auth_cookie(response, request, result.get("token"))
-    return _without_token(result)
+    return _auth_payload(result)
 
 
 @router.get("/qr/status")
@@ -143,3 +158,4 @@ async def logout(
     response = Response(status_code=204)
     response.delete_cookie("auth_token", path="/")
     return response
+
