@@ -7,7 +7,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
@@ -93,22 +94,18 @@ CORS_ORIGINS = [
     if origin and origin != "*"
 ]
 
-# Превью-деплои Cloudflare Pages живут на <hash>.aurogram.pages.dev —
-# их origin не совпадает с прод-доменом, иначе CORS рвёт /api/chats.
-CORS_ORIGIN_REGEX = r"https://[a-z0-9-]+\.aurogram\.pages\.dev"
-
+# allow_origin_regex намеренно убран: остаётся только явный список CORS_ORIGINS.
+# Превью-деплои (<hash>.aurogram.pages.dev) теперь НЕ допускаются — если они нужны,
+# добавляйте их в CORS_ORIGINS через переменную окружения.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Auth-Token", "X-Admin-Action-Token", "X-Device-Id"],
+    allow_methods=["*"],
+    allow_headers=["*"],
     expose_headers=["Retry-After"],
 )
-logging.getLogger("aurogram.cors").info(
-    "CORS allow_origins=%s regex=%s", CORS_ORIGINS, CORS_ORIGIN_REGEX
-)
+logging.getLogger("aurogram.cors").info("CORS allow_origins=%s", CORS_ORIGINS)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key or secrets.token_urlsafe(32),
@@ -136,6 +133,19 @@ for api_router in (
     health_router,
 ):
     app.include_router(api_router, prefix="/api")
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Любая необработанная ошибка должна вернуться через CORSMiddleware.
+
+    Иначе FastAPI отдаёт «голый» 500 без Access-Control-Allow-Origin,
+    и браузер показывает это как CORS/network error.
+    """
+    logging.getLogger("aurogram.errors").exception(
+        "unhandled error on %s %s", request.method, request.url.path
+    )
+    return JSONResponse({"detail": "Внутренняя ошибка сервера"}, status_code=500)
+
 
 app.include_router(admin_router)
 static_dir = Path(__file__).parent / "admin" / "static"
