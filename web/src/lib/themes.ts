@@ -1,4 +1,4 @@
-export type ThemeId = "aurogram" | "paper" | "mint" | "sky" | "ghost" | "midnight" | "ocean" | "sunset" | "orange" | "halloween";
+export type ThemeId = "aurogram" | "paper" | "mint" | "sky" | "sand" | "sakura" | "ice" | "ghost" | "midnight" | "ocean" | "sunset" | "orange" | "halloween";
 
 /** Семантические цвета темы. Каждое значение уходит в CSS-переменную через {@link applyTheme}. */
 export interface ThemeColors {
@@ -44,7 +44,7 @@ export interface AurogramTheme {
 }
 
 /**
- * Десять визуально различимых тем: у каждой свой фон, свои карточки
+ * Тринадцать визуально различимых тем: у каждой свой фон, свои карточки
  * и свой акцент. Контраст ink/canvas ≥ 14:1, акцент-текста ≥ 3:1,
  * текста на акцентной кнопке ≥ 3.7:1.
  */
@@ -103,6 +103,48 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     glass: {
       border: "rgba(15,30,43,0.04)", fill: "rgba(255,255,255,0.66)",
       highlight: "rgba(255,255,255,0.92)", glow: "rgb(2 132 199 / 12%)", blur: "24px", onAccent: "#FFFFFF",
+    },
+  },
+  sand: {
+    id: "sand",
+    name: "Sand",
+    dark: false,
+    colors: {
+      canvas: "#F5F5F0", surface: "#FFFDF8", raised: "#EFE8DA", ink: "#241A10", muted: "#7A6A57",
+      line: "rgba(36,26,16,0.05)", accent: "#8B5A2B", accentStrong: "#74491F", success: "#15803D",
+      warning: "#B45309", danger: "#B91C1C", ghost: "#A16207",
+    },
+    glass: {
+      border: "rgba(139,90,43,0.06)", fill: "rgba(255,253,248,0.72)",
+      highlight: "rgba(255,255,255,0.94)", glow: "rgb(139 90 43 / 14%)", blur: "24px", onAccent: "#FFFFFF",
+    },
+  },
+  sakura: {
+    id: "sakura",
+    name: "Sakura",
+    dark: false,
+    colors: {
+      canvas: "#FFF0F5", surface: "#FFFFFF", raised: "#FCE0EA", ink: "#2B0F1A", muted: "#8A5A6B",
+      line: "rgba(43,15,26,0.05)", accent: "#D81B60", accentStrong: "#BE185D", success: "#15803D",
+      warning: "#B45309", danger: "#B91C1C", ghost: "#9D174D",
+    },
+    glass: {
+      border: "rgba(216,27,96,0.07)", fill: "rgba(255,255,255,0.70)",
+      highlight: "rgba(255,255,255,0.95)", glow: "rgb(216 27 96 / 16%)", blur: "24px", onAccent: "#FFFFFF",
+    },
+  },
+  ice: {
+    id: "ice",
+    name: "Ice",
+    dark: false,
+    colors: {
+      canvas: "#F0F4F8", surface: "#FFFFFF", raised: "#DCE7F2", ink: "#0B1622", muted: "#55707F",
+      line: "rgba(11,22,34,0.05)", accent: "#0284C7", accentStrong: "#0369A1", success: "#15803D",
+      warning: "#B45309", danger: "#B91C1C", ghost: "#4F46E5",
+    },
+    glass: {
+      border: "rgba(2,132,199,0.07)", fill: "rgba(255,255,255,0.68)",
+      highlight: "rgba(255,255,255,0.96)", glow: "rgb(2 132 199 / 16%)", blur: "26px", onAccent: "#FFFFFF",
     },
   },
   ghost: {

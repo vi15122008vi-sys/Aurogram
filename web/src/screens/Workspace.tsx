@@ -14,12 +14,13 @@ interface WorkspaceProps {
   tab: AppTab;
   account: AuthAccount;
   onLogout: () => void;
+  onTabChange?: (tab: AppTab) => void;
 }
 
 type Row = BotRecord | ChatRecord;
 
 const tabContent = {
-  channels: { title: "Каналы", kicker: "PUBLISHING", icon: Radio, empty: "Каналов пока нет", hint: "Здесь появятся каналы, где у аккаунта есть права администратора." },
+  channels: { title: "Студия", kicker: "STUDIO", icon: Radio, empty: "Каналов пока нет", hint: "Здесь появятся каналы, где у аккаунта есть права администратора." },
   bots: { title: "Боты", kicker: "AUTOMATION", icon: Bot, empty: "Боты не подключены", hint: "Подключённые боты и состояние webhook будут отображаться здесь." },
   chats: { title: "Чаты", kicker: "INBOX", icon: MessageCircle, empty: "Чатов пока нет", hint: "Диалоги аккаунта появятся здесь после синхронизации." },
 } as const;
@@ -35,7 +36,7 @@ function itemMeta(item: Row, tab: AppTab): string {
   return "";
 }
 
-export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
+export function Workspace({ tab, account, onLogout, onTabChange }: WorkspaceProps) {
   const { t } = useI18n();
   const [rows, setRows] = useState<Row[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<{ id: number; title: string; username: string | null; subscribers: number; posts_count: number } | null>(null);
@@ -113,6 +114,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
           onPublish={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(false); }}
           onSchedule={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(true); }}
           onStatistics={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("stats"); setScheduleFocus(false); }}
+          onSendDirect={() => onTabChange?.("chats")}
         />;
   }
 

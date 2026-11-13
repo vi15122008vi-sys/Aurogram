@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowRight, ChartNoAxesColumn, Eye, Radio, RefreshCw, Search, Send, Timer, Users } from "lucide-react";
+import { ArrowRight, ChartNoAxesColumn, Eye, MessageCircle, Radio, RefreshCw, Search, Send, Timer, Users, X } from "lucide-react";
 import { api, type ChannelRecord } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { useI18n } from "../lib/i18n";
 
 interface ChannelsProps {
+  onSendDirect?: () => void;
   onOpen: (channel: ChannelRecord) => void;
   onPublish?: (channel: ChannelRecord) => void;
   onSchedule?: (channel: ChannelRecord) => void;
   onStatistics?: (channel: ChannelRecord) => void;
 }
 
-export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: ChannelsProps) {
+export function Channels({ onOpen, onPublish, onSchedule, onStatistics, onSendDirect }: ChannelsProps) {
   const { t, locale } = useI18n();
   const [listView, setListView] = useState<"channels" | "mine">("channels");
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
@@ -19,6 +20,7 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: Channe
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const number = useMemo(
     () => new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US"),
@@ -64,8 +66,8 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: Channe
     <section className="animate-[rise-in_240ms_ease-out]">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("ADMIN CONSOLE")}</p>
-          <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.02em] text-ink">{t("Каналы")}</h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("STUDIO", "STUDIO")}</p>
+          <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.02em] text-ink">{t("Студия")}</h1>
         </div>
         <button
           type="button"
@@ -98,9 +100,19 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: Channe
         />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-5 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[15px] font-semibold text-ink">{t("Мои каналы")}</h2>
+          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t("Под управлением", "Managed")} · {channels.length}</p>
+        </div>
+        <button type="button" onClick={() => setComposerOpen(true)} className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-accent px-4 text-xs font-semibold text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--accent)_30%,transparent)] transition hover:bg-accent-strong">
+          <Send size={14} />{t("Создать")}
+        </button>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="glass-panel inline-flex rounded-full p-1" role="tablist" aria-label={t("Раздел каналов")}>
-          {([["channels", "Каналы"], ["mine", "Мои каналы"]] as const).map(([id, label]) => (
+          {([["channels", "Все каналы"], ["mine", "Мои"]] as const).map(([id, label]) => (
             <button
               key={id}
               type="button"
@@ -175,6 +187,37 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: Channe
           </div>
         </div>
       )}
+      {composerOpen && (
+        <div role="dialog" aria-modal="true" aria-label={t("Создать")} className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-md" onClick={() => setComposerOpen(false)}>
+          <div className="glass-modal w-full max-w-sm p-4" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-ink">{t("Создать")}</h2>
+                <p className="mt-1 text-[11px] leading-4 text-muted">{t("Опубликуйте пост в канал или отправьте сообщение в личные.", "Publish to a channel or send a direct message.")}</p>
+              </div>
+              <button type="button" onClick={() => setComposerOpen(false)} aria-label={t("Закрыть")} className="grid size-8 shrink-0 place-items-center rounded-full bg-surface/60 text-muted transition hover:text-ink">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="mt-4 grid gap-2">
+              <button type="button" disabled={!channels.length} onClick={() => { setComposerOpen(false); if (channels[0]) onPublish?.(channels[0]); }} className="flex items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10 disabled:opacity-50">
+                <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><Send size={15} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-ink">{t("Опубликовать в канал")}</span>
+                  <span className="block truncate text-[11px] text-muted">{channels[0]?.title ?? t("Сначала добавьте канал", "Add a channel first")}</span>
+                </span>
+              </button>
+              <button type="button" onClick={() => { setComposerOpen(false); onSendDirect?.(); }} className="flex items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10">
+                <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><MessageCircle size={15} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-ink">{t("Отправить в личные сообщения")}</span>
+                  <span className="block text-[11px] text-muted">{t("Откроет список личных чатов", "Opens your direct chats")}</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -197,4 +240,5 @@ function ChannelStat({ icon, value, label }: { icon: ReactNode; value: string; l
     </span>
   );
 }
+
 

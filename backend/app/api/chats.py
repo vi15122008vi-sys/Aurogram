@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -14,6 +15,19 @@ from app.telegram.members import list_admins, list_members
 from app.telegram.messages import delete_message, list_messages, send_message
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+SESSION_ERRORS = ("AuthKeyUnregistered", "SessionRevoked", "UserDeactivated", "AuthKeyDuplicated")
+
+
+def telegram_error(exc: Exception) -> HTTPException:
+    """Невалидная сессия Telegram — это 401, а не сетевой сбой на клиенте."""
+    name = type(exc).__name__
+    if any(code in name for code in SESSION_ERRORS):
+        return HTTPException(
+            status_code=401,
+            detail="Сессия Telegram недействительна. Войдите в аккаунт заново.",
+        )
+    return HTTPException(status_code=502, detail="Telegram не ответил. Попробуйте позже.")
 
 
 class MessageCreate(BaseModel):
@@ -99,14 +113,26 @@ async def chats(
         (account["id"],),
     )
     archived_ids = {int(row["chat_id"]) for row in rows}
-    return await list_chats(account, limit=limit, archived_ids=archived_ids, archived=archived)
+    try:
+        return await list_chats(account, limit=limit, archived_ids=archived_ids, archived=archived)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise telegram_error(exc) from exc
 
 
 @router.get("/stories")
 async def stories(
     account: dict[str, Any] = Depends(get_current_account),
 ) -> list[dict[str, Any]]:
-    return await list_stories(account)
+    try:
+        return await list_stories(account)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # Истории не должны ломать экран чатов: отдаём пустой список вместо 500.
+        logging.getLogger("aurogram.chats").warning("stories: %s", exc)
+        raise telegram_error(exc) from exc
 
 
 @router.get("/stories/{peer_id}/avatar")

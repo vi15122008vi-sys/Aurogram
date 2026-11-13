@@ -76,9 +76,11 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=list(dict.fromkeys([
+CORS_ORIGINS = [
+    # ВАЖНО: "*" здесь запрещён — при allow_credentials=True браузер отклонит
+    # ответ, и фронтенд покажет «не удалось связаться с сервером».
+    origin
+    for origin in dict.fromkeys([
         *settings.cors_origin_list(),
         # Прод-домен API и страница админки — один origin, первый запрос с него тоже CORS.
         "https://aurogram.dpdns.org",
@@ -86,10 +88,25 @@ app.add_middleware(
         "https://aurogram.pages.dev",
         "http://localhost:5173",
         "http://localhost:4173",
-    ])),
+    ])
+    if origin and origin != "*"
+]
+
+# Превью-деплои Cloudflare Pages живут на <hash>.aurogram.pages.dev —
+# их origin не совпадает с прод-доменом, иначе CORS рвёт /api/chats.
+CORS_ORIGIN_REGEX = r"https://[a-z0-9-]+\.aurogram\.pages\.dev"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Auth-Token", "X-Admin-Action-Token", "X-Device-Id"],
+    expose_headers=["Retry-After"],
+)
+logging.getLogger("aurogram.cors").info(
+    "CORS allow_origins=%s regex=%s", CORS_ORIGINS, CORS_ORIGIN_REGEX
 )
 app.add_middleware(
     SessionMiddleware,

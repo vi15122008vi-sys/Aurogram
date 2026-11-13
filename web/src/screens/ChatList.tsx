@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Archive, ArchiveRestore, FolderPlus, MoreHorizontal, Phone, Search } from "lucide-react";
 import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
 import { Avatar } from "../components/Avatar";
@@ -101,6 +101,12 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
       `${chat.title} ${chat.username ?? ""} ${chat.last_message ?? ""}`.toLocaleLowerCase().includes(term),
     );
   }, [visibleChats, query]);
+
+  /* Личные диалоги идём отдельной группой сверху, остальное — ниже. */
+  const orderedChats = useMemo(() => {
+    if (filter !== "all") return localChats;
+    return [...localChats].sort((a, b) => Number(b.type === "user") - Number(a.type === "user"));
+  }, [localChats, filter]);
 
   async function createFolder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -221,8 +227,25 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
         </div>
       ) : (
       <div className="glass-panel mt-3 overflow-visible rounded-[26px] p-1">
-        {localChats.map((chat) => (
-          <article key={chat.id} className={`group relative flex items-center gap-1 px-0.5 ${rowDivider}`}>
+        {orderedChats.map((chat, index) => {
+          const previous = orderedChats[index - 1];
+          const isDirect = chat.type === "user";
+          const sectionLabel = filter === "all"
+            ? isDirect && index === 0
+              ? t("Личные")
+              : !isDirect && (!previous || previous.type === "user")
+                ? t("Группы и каналы")
+                : null
+            : null;
+          return (
+          <Fragment key={chat.id}>
+            {sectionLabel && (
+              <div className="flex items-center justify-between px-3 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
+                <span>{sectionLabel}</span>
+                <span>{filter === "all" && isDirect ? orderedChats.filter((item) => item.type === "user").length : null}</span>
+              </div>
+            )}
+          <article className={`group relative flex items-center gap-1 px-0.5 ${rowDivider}`}>
             <button type="button" onClick={() => onOpen?.(chat)} className="glass-hover flex min-w-0 flex-1 items-center gap-3 rounded-[20px] p-2 text-left transition duration-200 hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)]">
               <Avatar name={chat.title} id={chat.id} src={chatAvatarUrl(chat.id)} className="size-12 shrink-0 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_8%),0_8px_20px_rgb(0_0_0_/_18%)]" />
               <span className="min-w-0 flex-1">
@@ -279,7 +302,9 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
               )}
             </div>
           </article>
-        ))}
+          </Fragment>
+          );
+        })}
         {!localChats.length && <div className="flex min-h-32 items-center justify-center gap-2 px-4 py-12 text-center text-sm text-muted">{query.trim() ? t("Локально ничего не нашлось", "Nothing found locally") : t(filter === "archive" ? "Архив пуст" : "Чатов пока нет")}</div>}
       </div>
       )}

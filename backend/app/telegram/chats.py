@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from telethon.tl.types import Channel, Chat, User
 from telethon import utils
-from telethon.tl.functions.stories import GetAllStoriesRequest
+from telethon.tl.functions.stories import GetAllStoriesRequest, GetPeerStoriesRequest
 
 from app.models import ChatOut
 from app.cache.manager import upsert_message
@@ -87,27 +87,61 @@ async def list_chats(
     return out
 
 
+def _story_entry(peer_id: int, entity: Any, peer_stories: Any) -> Optional[dict[str, Any]]:
+    items = getattr(peer_stories, "stories", []) or []
+    if entity is None or not items:
+        return None
+    latest_id = max(int(item.id) for item in items)
+    return {
+        "peer_id": peer_id,
+        "title": _title(entity),
+        "username": getattr(entity, "username", None),
+        "count": len(items),
+        "unread": int(getattr(peer_stories, "max_read_id", 0) or 0) < latest_id,
+        "latest_story_id": latest_id,
+    }
+
+
+async def get_peer_stories(account: dict, peer_id: int) -> Optional[dict[str, Any]]:
+    """Истории одного собеседника: stories.GetPeerStoriesRequest(peer)."""
+    client = await get_client(account["id"], account)
+    entity = await client.get_entity(peer_id)
+    result = await with_floodwait(lambda: client(GetPeerStoriesRequest(peer=entity)))
+    return _story_entry(peer_id, entity, result.stories)
+
+
 async def list_stories(account: dict) -> list[dict[str, Any]]:
     client = await get_client(account["id"], account)
-    result = await with_floodwait(lambda: client(GetAllStoriesRequest()))
-    entities = [*getattr(result, "users", []), *getattr(result, "chats", [])]
-    by_peer = {utils.get_peer_id(entity): entity for entity in entities}
-    stories: list[dict[str, Any]] = []
-    for peer_stories in getattr(result, "peer_stories", []):
-        peer_id = utils.get_peer_id(peer_stories.peer)
-        entity = by_peer.get(peer_id)
-        items = getattr(peer_stories, "stories", []) or []
-        if entity is None or not items:
+    try:
+        result = await with_floodwait(lambda: client(GetAllStoriesRequest()))
+        entities = [*getattr(result, "users", []), *getattr(result, "chats", [])]
+        by_peer = {utils.get_peer_id(entity): entity for entity in entities}
+        stories: list[dict[str, Any]] = []
+        for peer_stories in getattr(result, "peer_stories", []):
+            peer_id = utils.get_peer_id(peer_stories.peer)
+            entry = _story_entry(peer_id, by_peer.get(peer_id), peer_stories)
+            if entry:
+                stories.append(entry)
+        if stories:
+            return stories
+    except Exception:
+        # Старые слои/аккаунты без агрегата: молча уходим в per-peer режим.
+        pass
+
+    # Фолбэк: спрашиваем истории адресно по последним диалогам.
+    stories = []
+    try:
+        dialogs = await client.get_dialogs(limit=15)
+    except Exception:
+        return stories
+    for dialog in dialogs:
+        try:
+            peer_id = utils.get_peer_id(dialog.entity)
+            entry = await get_peer_stories(account, peer_id)
+            if entry:
+                stories.append(entry)
+        except Exception:
             continue
-        latest_id = max(int(item.id) for item in items)
-        stories.append({
-            "peer_id": peer_id,
-            "title": _title(entity),
-            "username": getattr(entity, "username", None),
-            "count": len(items),
-            "unread": int(getattr(peer_stories, "max_read_id", 0) or 0) < latest_id,
-            "latest_story_id": latest_id,
-        })
     return stories
 
 
