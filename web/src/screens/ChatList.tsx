@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, FolderPlus, LoaderCircle, MoreHorizontal, Search } from "lucide-react";
+import { Archive, ArchiveRestore, FolderPlus, MoreHorizontal, Search } from "lucide-react";
 import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
 import { Avatar } from "../components/Avatar";
+import { OfflineBanner } from "../components/OfflineBanner";
+import { Skeleton } from "../components/Skeleton";
 import { useI18n } from "../lib/i18n";
 
 export type ChatFilter = "all" | "user" | "group" | "channel" | "archive";
@@ -12,6 +14,8 @@ interface ChatListProps {
   archivingId?: number | null;
   loading?: boolean;
   error?: string | null;
+  /** Данные пришли из локального кэша: сети нет. */
+  offline?: boolean;
   onFilterChange: (filter: ChatFilter) => void;
   onOpen?: (chat: ChatRecord) => void;
   onArchive?: (chat: ChatRecord) => void;
@@ -41,7 +45,7 @@ function chatTime(value: string | null | undefined, locale: "ru" | "en"): string
 /* Разделитель строк — волосяная линия вместо border у ячейки. */
 const rowDivider = "after:pointer-events-none after:absolute after:inset-x-4 after:bottom-0 after:h-px after:bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] after:content-[''] last:after:hidden";
 
-export function ChatList({ chats, filter, archivingId, loading = false, error, onFilterChange, onOpen, onArchive }: ChatListProps) {
+export function ChatList({ chats, filter, archivingId, loading = false, error, offline = false, onFilterChange, onOpen, onArchive }: ChatListProps) {
   const { t, locale } = useI18n();
   const [menuChatId, setMenuChatId] = useState<number | null>(null);
   const [stories, setStories] = useState<StoryPeer[]>([]);
@@ -127,6 +131,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
         <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-ink">{t("Чаты")}</h1>
         <span className="rounded-full bg-surface/60 px-2.5 py-1 font-mono text-[10px] tabular-nums text-muted">{visibleChats.length}</span>
       </div>
+      {offline && <OfflineBanner className="mt-3" />}
 
       <label className="glass-panel mt-4 flex h-11 items-center gap-2 rounded-[22px] px-3.5 text-muted focus-within:text-accent">
         <Search size={16} />
@@ -184,6 +189,20 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
 
       {error && <p role="alert" className="mt-3 rounded-[18px] bg-danger/10 px-3 py-2 text-sm text-danger shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--danger)_18%,transparent)]">{error}</p>}
 
+      {loading && !visibleChats.length ? (
+        <div className="glass-panel mt-3 rounded-[26px] p-1" aria-busy="true" aria-live="polite" aria-label={t("Загружаем чаты", "Loading chats")}>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-3 p-2">
+              <Skeleton className="size-12 shrink-0 rounded-full" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-3 w-2/5" />
+                <Skeleton className="h-3 w-3/5" />
+              </div>
+              <Skeleton className="h-3 w-8" />
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="glass-panel mt-3 overflow-visible rounded-[26px] p-1">
         {visibleChats.map((chat) => (
           <article key={chat.id} className={`group relative flex items-center gap-1 px-0.5 ${rowDivider}`}>
@@ -235,8 +254,9 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
             </div>
           </article>
         ))}
-        {!visibleChats.length && <div className="flex min-h-32 items-center justify-center gap-2 px-4 py-12 text-center text-sm text-muted">{loading ? <><LoaderCircle size={16} className="animate-spin" />{t("Загружаем…")}</> : t(filter === "archive" ? "Архив пуст" : "Чатов пока нет")}</div>}
+        {!visibleChats.length && <div className="flex min-h-32 items-center justify-center gap-2 px-4 py-12 text-center text-sm text-muted">{t(filter === "archive" ? "Архив пуст" : "Чатов пока нет")}</div>}
       </div>
+      )}
       </>}
     </section>
   );

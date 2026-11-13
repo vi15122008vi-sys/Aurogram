@@ -154,7 +154,9 @@ async def run_cleanup() -> dict:
         if changed:
             await _compact_account(aid)
 
-    # LRU by size when over budget (TTL==0 or still over)
+    # LRU by size when over budget (TTL==0 or still over).
+    # Порядок жёсткий: сначала самое давно неиспользуемое медиа, и только потом —
+    # сообщения, да и то лишь при CACHE_EVICT_MESSAGES=true.
     total = _dir_size(cache_root) + _dir_size(media_root)
     if total <= max_bytes:
         if freed or msg_removed or media_removed:
@@ -237,32 +239,49 @@ async def run_cleanup() -> dict:
         await _compact_account(aid)
     total = _dir_size(cache_root) + _dir_size(media_root)
 
-    # Reclaim database pages after deleting the least recently accessed messages.
     if total > target:
-        for aid in account_ids:
-            while total > target:
+        if settings.cache_evict_messages:
+            # Осознанный opt-in: вытесняем самые давно читавшиеся сообщения.
+            for aid in account_ids:
+                while total > target:
+                    conn = await connect_cache(aid)
+                    try:
+                        cur = await conn.execute(
+                            """SELECT chat_id, id FROM cached_messages
+                               ORDER BY COALESCE(last_access, date, '') ASC LIMIT 5000"""
+                        )
+                        rows = await cur.fetchall()
+                        if not rows:
+                            break
+                        await conn.executemany(
+                            "DELETE FROM cached_messages WHERE chat_id = ? AND id = ?",
+                            [(row["chat_id"], row["id"]) for row in rows],
+                        )
+                        msg_removed += len(rows)
+                        await conn.commit()
+                        await conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                        await conn.execute("VACUUM")
+                    finally:
+                        await conn.close()
+                    total = _dir_size(cache_root) + _dir_size(media_root)
+                if total <= target:
+                    break
+        else:
+            # Медиа закончилось, а лимит всё ещё превышен: историю не трогаем,
+            # только подчищаем WAL, чтобы не раздувались служебные файлы.
+            for aid in account_ids:
                 conn = await connect_cache(aid)
                 try:
-                    cur = await conn.execute(
-                        """SELECT chat_id, id FROM cached_messages
-                           ORDER BY COALESCE(last_access, date, '') ASC LIMIT 5000"""
-                    )
-                    rows = await cur.fetchall()
-                    if not rows:
-                        break
-                    await conn.executemany(
-                        "DELETE FROM cached_messages WHERE chat_id = ? AND id = ?",
-                        [(row["chat_id"], row["id"]) for row in rows],
-                    )
-                    msg_removed += len(rows)
-                    await conn.commit()
                     await conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    await conn.execute("VACUUM")
+                    await conn.commit()
                 finally:
                     await conn.close()
-                total = _dir_size(cache_root) + _dir_size(media_root)
-            if total <= target:
-                break
+            log.warning(
+                "cleanup: %.2f GB > %.2f GB после LRU медиа; сообщения не удаляем "
+                "(CACHE_EVICT_MESSAGES=false)",
+                total / (1024**3),
+                max_bytes / (1024**3),
+            )
 
     log.info(
         "cleanup: freed %.1f GB, %s messages, %s media",

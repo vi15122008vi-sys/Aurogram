@@ -64,3 +64,15 @@ CREATE TABLE IF NOT EXISTS cached_sources (
 CREATE INDEX IF NOT EXISTS idx_messages_date ON cached_messages(date);
 CREATE INDEX IF NOT EXISTS idx_media_message ON cached_media(chat_id, message_id);
 CREATE INDEX IF NOT EXISTS idx_chats_last ON cached_chats(last_message_date);
+
+-- Быстрый рендер истории чата: WHERE chat_id = ? ORDER BY date DESC.
+CREATE INDEX IF NOT EXISTS idx_messages_chat_date ON cached_messages(chat_id, date DESC);
+-- Поиск сообщений по автору и по автору в хронологии (админка, антиспам-разборы).
+CREATE INDEX IF NOT EXISTS idx_messages_sender ON cached_messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_date ON cached_messages(sender_id, date DESC);
+-- LRU-очистка кэша: индекс по last_access создаётся в connect_cache()
+-- (колонка добавляется ALTER'ом для старых баз, поэтому здесь её быть не может).
+-- Медиа: LRU по last_access, выборка по сообщению и по времени создания.
+CREATE INDEX IF NOT EXISTS idx_media_last_access ON cached_media(last_access);
+CREATE INDEX IF NOT EXISTS idx_media_created ON cached_media(created_at);
+CREATE INDEX IF NOT EXISTS idx_media_expires ON cached_media(expires_at);

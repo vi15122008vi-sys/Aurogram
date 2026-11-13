@@ -3,6 +3,9 @@ import { motion } from "framer-motion";
 import { ArrowDownToLine, LoaderCircle, Pin, PinOff, Send, StopCircle, Video } from "lucide-react";
 import { api, type MessageRecord } from "../lib/api";
 import { springPress } from "../lib/motion";
+import { isOfflineError, readCache, writeCache } from "../lib/offline";
+import { OfflineBanner } from "../components/OfflineBanner";
+import { Skeleton } from "../components/Skeleton";
 import { VoicePlayer } from "../components/VoicePlayer";
 import { useI18n } from "../lib/i18n";
 
@@ -59,6 +62,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   const [sending, setSending] = useState(false);
   const [lastSentId, setLastSentId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
   const [reactionTarget, setReactionTarget] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [sendingVideo, setSendingVideo] = useState(false);
@@ -80,14 +84,27 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     setLoading(true);
     setMessages([]);
     setError(null);
+    setOffline(false);
+    const cacheKey = `messages:${chatId}`;
     api.messages.list(chatId, pageSize)
       .then((result) => {
         if (!active) return;
         setMessages([...result].reverse());
         setHasMore(result.length === pageSize);
+        writeCache(cacheKey, result);
       })
       .catch((cause: unknown) => {
-        if (active) setError(t(cause instanceof Error ? cause.message : "Не удалось загрузить сообщения"));
+        if (!active) return;
+        // Нет сети — поднимаем последнюю копию переписки из localStorage.
+        if (isOfflineError(cause)) {
+          const cached = readCache<MessageRecord[]>(cacheKey);
+          if (cached?.length) {
+            setMessages([...cached].reverse());
+            setOffline(true);
+            return;
+          }
+        }
+        setError(t(cause instanceof Error ? cause.message : "Не удалось загрузить сообщения"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -207,8 +224,21 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   return (
     <section className="glass-panel overflow-hidden rounded-[26px]">
       {hasMore && <div className="p-2 text-center shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--ink)_4%,transparent)]"><button type="button" onClick={loadOlder} disabled={loadingOlder} className="inline-flex h-8 items-center gap-2 rounded-full bg-surface/60 px-3.5 text-xs font-medium text-muted hover:text-ink disabled:opacity-50"><ArrowDownToLine size={14} />{loadingOlder ? t("Загружаем…") : t("Загрузить предыдущие")}</button></div>}
+      {offline && <div className="px-3 pt-3"><OfflineBanner /></div>}
       <div className="max-h-[55vh] min-h-48 space-y-3 overflow-y-auto bg-black/[0.06] p-3 sm:p-4">
-        {loading && <div className="flex justify-center py-8 text-muted"><LoaderCircle size={18} className="animate-spin" /></div>}
+        {loading && !messages.length && (
+          <div className="space-y-3" aria-busy="true" aria-live="polite" aria-label={t("Загружаем сообщения", "Loading messages")}>
+            {[62, 44, 72, 38, 55].map((width, index) => (
+              <div key={index} className={`flex ${index % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                <div className="space-y-2 rounded-[20px] bg-surface/40 px-3.5 py-3" style={{ width: `${width}%` }}>
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {loading && !!messages.length && <div className="flex justify-center py-3 text-muted"><LoaderCircle size={16} className="animate-spin" /></div>}
         {!loading && !messages.length && <p className="py-10 text-center text-sm text-muted">{t("Сообщений нет")}</p>}
         {dateGroups.map((group) => (
           <div key={group.label}>

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from telethon import events
-from telethon.errors import AuthKeyUnregisteredError, FloodWaitError
+from telethon.errors import AuthKeyUnregisteredError, FloodWaitError, SessionRevokedError
 from telethon import utils
 from telethon.tl.types import PeerChannel
 
@@ -151,6 +151,18 @@ async def _run_account(account: dict, device_id: str) -> None:
         log.error("account %s: session invalidated", account["id"][:8])
         await execute("UPDATE accounts SET auth_state = 'dead' WHERE id = ?", (account["id"],))
         await drop_client(account["id"])
+    except SessionRevokedError:
+        # Сессию отозвали (выход из всех устройств, смена пароля 2FA).
+        # Не роняем listener и не помечаем аккаунт мёртвым: ждём 60 секунд
+        # и пробуем снова — сессия может ожить после повторной авторизации.
+        _errors_24h += 1
+        _status = "session_revoked"
+        log.error(
+            "account %s: сессия отозвана (SessionRevokedError), пауза 60 с перед повтором",
+            account["id"][:8],
+        )
+        await drop_client(account["id"])
+        await asyncio.sleep(60)
     except Exception as e:
         _errors_24h += 1
         _status = "reconnecting"

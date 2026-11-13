@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     cache_cleanup_interval_min: int = Field(default=60, alias="CACHE_CLEANUP_INTERVAL_MIN")
     cache_target_ratio: float = Field(default=0.9, alias="CACHE_TARGET_RATIO")
     cache_min_keep_days: int = Field(default=7, alias="CACHE_MIN_KEEP_DAYS")
+    # При превышении лимита по умолчанию вытесняем только медиа (LRU):
+    # сообщения — это история пользователя, их удаление включается явно.
+    cache_evict_messages: bool = Field(default=False, alias="CACHE_EVICT_MESSAGES")
 
     admin_user: str = Field(default="admin", alias="ADMIN_USER")
     admin_password: str = Field(default="change-me", alias="ADMIN_PASSWORD")

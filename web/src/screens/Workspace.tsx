@@ -7,6 +7,7 @@ import { ChannelDetail } from "./ChannelDetail";
 import { MessageList } from "./MessageList";
 import { Settings } from "./Settings";
 import { ChatList, type ChatFilter } from "./ChatList";
+import { isOfflineError, readCache, writeCache } from "../lib/offline";
 import { useI18n } from "../lib/i18n";
 
 interface WorkspaceProps {
@@ -45,6 +46,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   const [archivingId, setArchivingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const chatMode = tab === "chats" && chatFilter === "archive" ? "archive" : "active";
 
@@ -60,13 +62,27 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     let active = true;
     setLoading(true);
     setError(null);
+    setOffline(false);
+    const cacheKey = tab === "bots" ? "bots" : `chats:${chatMode}`;
     const load = tab === "bots" ? api.bots.list() : api.chats.list(chatMode === "archive");
     load
       .then((items) => {
-        if (active) setRows(items);
+        if (!active) return;
+        setRows(items);
+        writeCache(cacheKey, items);
       })
       .catch((cause: unknown) => {
-        if (active) setError(t(cause instanceof Error ? cause.message : "Не удалось загрузить данные"));
+        if (!active) return;
+        // Нет сети — показываем последний удачный ответ и баннер «Показан кэш».
+        if (isOfflineError(cause)) {
+          const cached = readCache<Row[]>(cacheKey);
+          if (cached?.length) {
+            setRows(cached);
+            setOffline(true);
+            return;
+          }
+        }
+        setError(t(cause instanceof Error ? cause.message : "Не удалось загрузить данные"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -114,7 +130,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
         </section>
       );
     }
-    return <ChatList chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={(chat) => void toggleChatArchive(chat)} archivingId={archivingId} loading={loading} error={error} />;
+    return <ChatList chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={(chat) => void toggleChatArchive(chat)} archivingId={archivingId} loading={loading} error={error} offline={offline} />;
   }
 
   const content = tabContent[tab];

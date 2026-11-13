@@ -81,6 +81,9 @@ async def connect_cache(account_id: str) -> aiosqlite.Connection:
         await conn.execute(
             "UPDATE cached_messages SET last_access = COALESCE(date, datetime('now')) WHERE last_access IS NULL"
         )
+    # Индекс для LRU-вытеснения создаём только после миграции колонки:
+    # в schema.sql его нет, иначе старые базы падали бы на executescript.
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_last_access ON cached_messages(last_access)")
     await conn.commit()
     return conn
 
