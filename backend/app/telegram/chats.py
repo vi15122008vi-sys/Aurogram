@@ -91,7 +91,8 @@ def _story_entry(peer_id: int, entity: Any, peer_stories: Any) -> Optional[dict[
     items = getattr(peer_stories, "stories", []) or []
     if entity is None or not items:
         return None
-    latest_id = max(int(item.id) for item in items)
+    latest = max(items, key=lambda item: int(item.id))
+    latest_id = int(latest.id)
     return {
         "peer_id": peer_id,
         "title": _title(entity),
@@ -99,6 +100,8 @@ def _story_entry(peer_id: int, entity: Any, peer_stories: Any) -> Optional[dict[
         "count": len(items),
         "unread": int(getattr(peer_stories, "max_read_id", 0) or 0) < latest_id,
         "latest_story_id": latest_id,
+        # Фронтенд решает, показывать превью истории или градиентную заглушку.
+        "has_media": getattr(latest, "media", None) is not None,
     }
 
 
@@ -146,9 +149,34 @@ async def list_stories(account: dict) -> list[dict[str, Any]]:
 
 
 async def get_story_avatar(account: dict, peer_id: int) -> bytes | None:
+    """Аватар для кольца историй (профильное фото, не сама история)."""
     client = await get_client(account["id"], account)
     entity = await with_floodwait(lambda: client.get_entity(peer_id))
     return await with_floodwait(lambda: client.download_profile_photo(entity))
+
+
+async def get_story_media(account: dict, peer_id: int, story_id: int = 0) -> bytes | None:
+    """Медиа конкретной истории: stories.GetPeerStoriesRequest → download_media.
+
+    Если истории с таким id нет (или у неё нет медиа) — отдаём профильное фото,
+    чтобы превью не было пустым.
+    """
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(peer_id))
+    result = await with_floodwait(lambda: client(GetPeerStoriesRequest(peer=entity)))
+    stories = getattr(getattr(result, "stories", None), "stories", []) or []
+    target = None
+    for item in stories:
+        if int(getattr(item, "id", 0)) == int(story_id):
+            target = item
+            break
+    if target is None and stories:
+        target = max(stories, key=lambda item: int(getattr(item, "id", 0)))
+    media = getattr(target, "media", None) if target is not None else None
+    if media is None:
+        return await with_floodwait(lambda: client.download_profile_photo(entity))
+    data = await with_floodwait(lambda: client.download_media(media, file=bytes))
+    return bytes(data) if isinstance(data, (bytes, bytearray)) else None
 
 
 async def get_chat(account: dict, chat_id: int) -> Optional[ChatOut]:

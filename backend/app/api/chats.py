@@ -10,7 +10,7 @@ from app.deps import get_current_account
 from app.database import execute, fetchall
 from app.cache.manager import search_cached
 from app.models import ChatOut, MemberOut, MessageOut
-from app.telegram.chats import get_chat, get_story_avatar, list_chats, list_stories
+from app.telegram.chats import get_chat, get_story_avatar, get_story_media, list_chats, list_stories
 from app.telegram.members import list_admins, list_members
 from app.telegram.messages import delete_message, list_messages, send_message
 
@@ -133,6 +133,21 @@ async def stories(
         # Истории не должны ломать экран чатов: отдаём пустой список вместо 500.
         logging.getLogger("aurogram.chats").warning("stories: %s", exc)
         raise telegram_error(exc) from exc
+
+
+@router.get("/stories/{peer_id}/media")
+async def story_media(
+    peer_id: int,
+    story_id: int = Query(default=0, ge=0),
+    account: dict[str, Any] = Depends(get_current_account),
+) -> Response:
+    try:
+        image = await get_story_media(account, peer_id, story_id)
+    except Exception as exc:
+        raise telegram_error(exc) from exc
+    if not image:
+        raise HTTPException(status_code=404, detail="Медиа истории не найдено")
+    return Response(content=image, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.get("/stories/{peer_id}/avatar")

@@ -1,4 +1,4 @@
-const CACHE_NAME = "aurogram-shell-v2";
+const CACHE_NAME = "aurogram-shell-v3";
 const SHELL_URLS = ["/", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

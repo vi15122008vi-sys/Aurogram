@@ -246,6 +246,11 @@ export function storyAvatarUrl(peerId: number): string {
   return apiUrl(`/chats/stories/${peerId}/avatar`);
 }
 
+/** Медиа самой истории (не аватар): конкретный story_id или последняя история. */
+export function storyMediaUrl(peerId: number, storyId: number = 0): string {
+  return apiUrl(`/chats/stories/${peerId}/media?story_id=${storyId}`);
+}
+
 export function chatAvatarUrl(chatId: number): string {
   return apiUrl(`/chats/${chatId}/avatar`);
 }

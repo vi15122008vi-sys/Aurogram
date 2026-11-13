@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, FolderPlus, MessageCircle, MoreHorizontal, Phone, Search, X } from "lucide-react";
+import { Archive, ArchiveRestore, Check, FolderPlus, MessageCircle, MoreHorizontal, Phone, Search, X } from "lucide-react";
 import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { Fab } from "../components/Fab";
+import { StoryViewer } from "../components/StoryViewer";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { Skeleton } from "../components/Skeleton";
 import { openCall } from "../lib/callbus";
@@ -55,6 +56,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
   const [searchResults, setSearchResults] = useState<GlobalSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [storyIndex, setStoryIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [folders, setFolders] = useState<ChatFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
@@ -165,13 +167,19 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
           {stories.length > 0 && <span className="font-mono text-[10px] text-muted">{stories.length}</span>}
         </div>
         <div className="flex min-h-[76px] gap-3 overflow-x-auto pb-1">
-          {stories.length ? stories.map((story) => (
-            <div key={story.peer_id} className="flex w-[58px] shrink-0 flex-col items-center gap-1.5">
+          {stories.length ? stories.map((story, index) => (
+            <button
+              key={story.peer_id}
+              type="button"
+              onClick={() => setStoryIndex(index)}
+              aria-label={`${story.title} — ${t("открыть историю", "open story")}`}
+              className="flex w-[58px] shrink-0 flex-col items-center gap-1.5 rounded-[16px] p-0.5 transition hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)]"
+            >
               <span className={`size-[54px] rounded-full p-[2px] ${story.unread ? "bg-gradient-to-br from-fuchsia-500 via-accent to-amber-400" : "bg-[color-mix(in_srgb,var(--ink)_8%,transparent)]"}`}>
                 <Avatar name={story.title} id={story.peer_id} src={storyAvatarUrl(story.peer_id)} className="size-full" />
               </span>
               <span className="w-full truncate text-center text-[10px] text-muted">{story.title}</span>
-            </div>
+            </button>
           )) : <p className="flex items-center text-xs text-muted">{t("Новых историй пока нет")}</p>}
         </div>
       </div>
@@ -300,7 +308,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
                     {filter === "archive" ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                     {t(filter === "archive" ? "Убрать из архива" : "В архив")}
                   </button>
-                  {folders.length > 0 && <div className="mt-1 pt-1"><div className="glass-divider mx-2" aria-hidden="true" /><p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-muted">{t("Папка")}</p>{folders.map((folder) => <button key={folder.id} type="button" role="menuitem" onClick={() => void assignFolder(chat, folder.id)} className="flex w-full items-center rounded-[14px] px-3 py-2 text-left text-xs text-ink hover:bg-accent/10">{folder.chat_ids.includes(chat.id) ? "✓ " : "  "}{folder.name}</button>)}{folders.some((folder) => folder.chat_ids.includes(chat.id)) && <button type="button" role="menuitem" onClick={() => void assignFolder(chat, null)} className="flex w-full items-center rounded-[14px] px-3 py-2 text-left text-xs text-muted hover:bg-raised">{t("Убрать из папки")}</button>}</div>}
+                  {folders.length > 0 && <div className="mt-1 pt-1"><div className="glass-divider mx-2" aria-hidden="true" /><p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-muted">{t("Папка")}</p>{folders.map((folder) => <button key={folder.id} type="button" role="menuitem" onClick={() => void assignFolder(chat, folder.id)} className="flex w-full items-center gap-1.5 rounded-[14px] px-3 py-2 text-left text-xs text-ink hover:bg-accent/10">{folder.chat_ids.includes(chat.id) && <Check size={12} className="shrink-0 text-accent" />}{folder.name}</button>)}{folders.some((folder) => folder.chat_ids.includes(chat.id)) && <button type="button" role="menuitem" onClick={() => void assignFolder(chat, null)} className="flex w-full items-center rounded-[14px] px-3 py-2 text-left text-xs text-muted hover:bg-raised">{t("Убрать из папки")}</button>}</div>}
                 </div>
               )}
             </div>
@@ -354,6 +362,14 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
             </button>
           </div>
         </div>
+      )}
+      {storyIndex !== null && stories[storyIndex] && (
+        <StoryViewer
+          stories={stories}
+          index={storyIndex}
+          onIndexChange={(next) => setStoryIndex(Math.max(0, Math.min(stories.length - 1, next)))}
+          onClose={() => setStoryIndex(null)}
+        />
       )}
     </section>
   );
