@@ -45,6 +45,13 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # Пересборка контейнера не чистит /app/sessions: убираем дубли до старта listener.
+    try:
+        from app.telegram.sessions import cleanup_old_sessions
+
+        cleanup_old_sessions(keep_per_account=1)
+    except Exception as exc:  # очистка не должна мешать запуску
+        log.warning("session cleanup failed: %s", exc)
     await init_db()
     from app.security import audit_secrets, ensure_secret_key
 

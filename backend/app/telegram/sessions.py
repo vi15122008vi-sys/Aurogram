@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import logging
+import re
+
 import os
 from pathlib import Path
 
 from app.config import get_settings
+
+log = logging.getLogger("aurogram.sessions")
 
 
 def sessions_root() -> Path:
@@ -46,3 +51,43 @@ def delete_session(account_id: str) -> None:
                 candidate.unlink()
             except OSError:
                 pass
+
+
+_SESSION_NAME = re.compile(r"^session_user_(?P<account>.+?)_device_[^/\\]+?\.session$")
+
+
+def cleanup_old_sessions(keep_per_account: int = 1) -> list[Path]:
+    """Удаляет лишние файлы сессий, оставляя самый свежий на каждый аккаунт.
+
+    Пересборка контейнера не трогает /app/sessions, и там могут накопиться
+    дубли одного и того же аккаунта — Listener путается и Telegram отвечает
+    SessionRevokedError. Чистим при старте: по одному (самому новому) файлу
+    на аккаунт; сессии разных аккаунтов не затрагиваются.
+    """
+    root = sessions_root()
+    grouped: dict[str, list[Path]] = {}
+    for path in root.glob("session_user_*device_*.session"):
+        match = _SESSION_NAME.match(path.name)
+        account = match.group("account") if match else path.stem
+        grouped.setdefault(account, []).append(path)
+
+    removed: list[Path] = []
+    for account, paths in grouped.items():
+        if len(paths) <= keep_per_account:
+            continue
+        paths.sort(key=lambda item: item.stat().st_mtime, reverse=True)
+        for stale in paths[keep_per_account:]:
+            try:
+                stale.unlink(missing_ok=True)
+                for suffix in ("-journal", "-wal", "-shm"):
+                    Path(str(stale) + suffix).unlink(missing_ok=True)
+                removed.append(stale)
+            except OSError as exc:
+                log.warning("не удалось удалить сессию %s: %s", stale.name, exc)
+
+    if removed:
+        log.warning(
+            "Удалены старые сессии, оставлена только одна: %s",
+            ", ".join(path.name for path in removed),
+        )
+    return removed
