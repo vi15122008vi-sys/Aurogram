@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.cache.manager import touch_cached_media
@@ -98,6 +98,7 @@ class PinUpdate(BaseModel):
 @router.get("", response_model=list[MessageOut])
 async def messages(
     chat_id: int,
+    response: Response,
     limit: int = Query(default=50, ge=1, le=100),
     offset_id: int = Query(default=0, ge=0),
     ghost: bool = True,
@@ -105,13 +106,24 @@ async def messages(
 ) -> list[MessageOut]:
     privacy = await fetchone("SELECT no_read_receipts FROM account_preferences WHERE account_id = ?", (account["id"],))
     ghost = bool(privacy["no_read_receipts"]) if privacy else True
-    return await _safe_list_messages(
-        account,
-        chat_id,
-        limit=limit,
-        offset_id=offset_id,
-        ghost=ghost,
-    )
+    try:
+        return await _safe_list_messages(
+            account,
+            chat_id,
+            limit=limit,
+            offset_id=offset_id,
+            ghost=ghost,
+        )
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            # Мёртвая сессия: чистим cookie, чтобы браузер не таскал токен.
+            response.delete_cookie("auth_token", path="/")
+            return JSONResponse(
+                status_code=401,
+                content={"detail": exc.detail},
+                headers={"Set-Cookie": "auth_token=; Path=/; Max-Age=0; SameSite=Lax"},
+            )
+        raise
 
 
 @router.post("", response_model=MessageOut, status_code=201)

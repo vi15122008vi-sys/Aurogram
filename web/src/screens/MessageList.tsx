@@ -64,6 +64,8 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   const [error, setError] = useState<string | null>(null);
   const [authExpired, setAuthExpired] = useState(false);
   const [retryLeft, setRetryLeft] = useState(0);
+  const wasFloodWait = useRef(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (retryLeft <= 0) return;
@@ -72,6 +74,14 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     }, 1000);
     return () => window.clearInterval(timer);
   }, [retryLeft > 0]);
+
+  // Таймер дошёл до нуля после FloodWait — перезагружаем сообщения сами.
+  useEffect(() => {
+    if (retryLeft !== 0 || !wasFloodWait.current) return;
+    wasFloodWait.current = false;
+    setReloadKey((value) => value + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryLeft]);
 
   function formatRetry(total: number): string {
     const minutes = Math.floor(total / 60);
@@ -113,6 +123,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
         if (cause instanceof ApiError && cause.status === 401) setAuthExpired(true);
           if (cause instanceof ApiError && cause.status === 429) {
             const seconds = cause.retryAfter ?? Number((cause.message.match(/(\d+)/) ?? [])[1] ?? 60);
+            wasFloodWait.current = true;
             setRetryLeft(seconds);
           }
         if (!active) return;
@@ -131,7 +142,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [chatId, pageSize]);
+  }, [chatId, pageSize, reloadKey]);
 
   useEffect(() => {
     if (videoPreviewRef.current && recordingStream) videoPreviewRef.current.srcObject = recordingStream;
