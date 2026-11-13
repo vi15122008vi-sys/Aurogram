@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bot, CalendarDays, Download, Loader2, LogOut, MessageSquare, Pencil, Radio, Send, Sparkles, Users, X,
+  Bot, CalendarDays, Database, Download, Ghost, Loader2, LogOut, MessageSquare, Palette, Pencil, Radio, Send, Sparkles, Users, X,
 } from "lucide-react";
 import { api, storyAvatarUrl, type AiAnswer, type AuthAccount, type ChannelRecord, type MyProfile, type StoryPeer } from "../lib/api";
 import { GlassButton } from "../components/Buttons";
+import { applyTheme, themeList, type ThemeId } from "../lib/themes";
 import { springModal } from "../lib/motion";
 import { useI18n } from "../lib/i18n";
 
@@ -26,7 +27,9 @@ function saveBlob(blob: Blob, filename: string): void {
 
 /** Профиль как в Telegram: шапка, закреплённые истории, канал, активность и AI. */
 export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const [ghostBusy, setGhostBusy] = useState(false);
+  const [quickNotice, setQuickNotice] = useState<string | null>(null);
   const [me, setMe] = useState<MyProfile | null>(null);
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
   const [stories, setStories] = useState<StoryPeer[]>([]);
@@ -101,6 +104,41 @@ export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
   async function togglePinned(peerId: number) {
     const next = pinnedIds.includes(peerId) ? pinnedIds.filter((id) => id !== peerId) : [...pinnedIds, peerId].slice(0, 3);
     await patch({ pinned_story_ids: next });
+  }
+
+  function cycleTheme() {
+    const current = (localStorage.getItem("aurogram.theme") as ThemeId | null) ?? "aurogram";
+    const index = themeList.findIndex((item) => item.id === current);
+    const next = themeList[(index + 1) % themeList.length];
+    localStorage.setItem("aurogram.theme", next.id);
+    applyTheme(next.id);
+    setQuickNotice(`${t("Тема", "Theme")}: ${next.name}`);
+  }
+
+  async function toggleGhost() {
+    setGhostBusy(true);
+    setQuickNotice(null);
+    try {
+      const current = await api.privacy.get();
+      const updated = await api.privacy.update({ hide_online: !current.hide_online });
+      setQuickNotice(updated.hide_online ? t("Ghost Mode включён", "Ghost Mode on") : t("Ghost Mode выключен", "Ghost Mode off"));
+    } catch (cause) {
+      setQuickNotice(cause instanceof Error ? cause.message : t("Не удалось переключить Ghost Mode"));
+    } finally {
+      setGhostBusy(false);
+    }
+  }
+
+  function clearLocalCache() {
+    if (!window.confirm(t("Очистить локальный кэш? Данные будут загружены заново.", "Clear local cache? Data will be re-downloaded."))) return;
+    let removed = 0;
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("aurogram.cache.") || key.startsWith("aurogram.chats.")) {
+        localStorage.removeItem(key);
+        removed += 1;
+      }
+    }
+    setQuickNotice(`${t("Кэш очищен", "Cache cleared")} (${removed})`);
   }
 
   async function exportData() {
@@ -274,6 +312,32 @@ export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
             <Bot size={13} />{t("Спросить AI")}
           </button>
         </div>
+      </div>
+
+      <div className="glass-panel mt-3 rounded-[26px] p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-ink">{t("Быстрые действия")}</h2>
+          {me?.account.created_at && (
+            <span className="font-mono text-[10px] text-muted">
+              {t("с", "since")} {new Date(me.account.created_at).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
+            </span>
+          )}
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <button type="button" onClick={cycleTheme} className="flex flex-col items-start gap-1.5 rounded-[18px] bg-surface/50 p-3 text-left transition hover:bg-accent/10">
+            <span className="grid size-8 place-items-center rounded-[10px] bg-accent/10 text-accent"><Palette size={14} /></span>
+            <span className="text-[11px] font-medium text-ink">{t("Сменить тему")}</span>
+          </button>
+          <button type="button" onClick={() => void toggleGhost()} disabled={ghostBusy} className="flex flex-col items-start gap-1.5 rounded-[18px] bg-surface/50 p-3 text-left transition hover:bg-accent/10 disabled:opacity-50">
+            <span className="grid size-8 place-items-center rounded-[10px] bg-accent/10 text-accent">{ghostBusy ? <Loader2 size={14} className="animate-spin" /> : <Ghost size={14} />}</span>
+            <span className="text-[11px] font-medium text-ink">Ghost Mode</span>
+          </button>
+          <button type="button" onClick={clearLocalCache} className="flex flex-col items-start gap-1.5 rounded-[18px] bg-surface/50 p-3 text-left transition hover:bg-danger/10">
+            <span className="grid size-8 place-items-center rounded-[10px] bg-danger/10 text-danger"><Database size={14} /></span>
+            <span className="text-[11px] font-medium text-ink">{t("Очистить кэш")}</span>
+          </button>
+        </div>
+        {quickNotice && <p role="status" className="mt-2 text-[11px] text-muted">{quickNotice}</p>}
       </div>
 
       <AnimatePresence>

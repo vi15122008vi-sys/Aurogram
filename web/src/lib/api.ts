@@ -221,6 +221,7 @@ export interface MyProfile {
     username: string | null;
     phone: string;
     auth_state: "ok" | "pending" | "dead" | null;
+    created_at?: string | null;
   };
   profile: {
     display_name: string | null;

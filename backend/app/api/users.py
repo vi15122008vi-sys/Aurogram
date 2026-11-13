@@ -84,6 +84,7 @@ async def users_me(account: dict[str, Any] = Depends(get_current_account)) -> di
             "username": account.get("username"),
             "phone": account.get("phone") or "",
             "auth_state": account.get("auth_state"),
+            "created_at": account.get("created_at"),
         },
         "profile": {
             "display_name": profile["display_name"],
