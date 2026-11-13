@@ -33,7 +33,7 @@
   --muted: #a1a1aa;
   --muted-rgb: 161 161 170;
   --line: rgb(255 255 255 / 3.2%);
-  --glass-fill: rgb(255 255 255 / 4.5%);
+  --glass-fill: rgb(255 255 255 / 5%);
   --glass-highlight: rgb(255 255 255 / 8%);
   --glass-blur: 26px;
   --theme-glow: rgb(99 102 241 / 16%);
@@ -320,3 +320,4 @@ button:active, [role="button"]:active { transform: scale(.97); }
     padding-bottom: 5.5rem;
   }
 }
+

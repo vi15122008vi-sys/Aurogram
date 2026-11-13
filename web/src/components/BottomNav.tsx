@@ -1,4 +1,4 @@
-import { Bot, MessagesSquare, RadioTower, SlidersHorizontal } from "lucide-react";
+import { Bot, MessageCircle, Rss, Settings2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { springPress } from "../lib/motion";
@@ -10,11 +10,12 @@ interface BottomNavProps {
   onChange: (tab: AppTab) => void;
 }
 
+/* Тонкие иконки Lucide (stroke 1.4) вместо плотных заливок. */
 const items = [
-  { id: "channels", label: "Каналы", icon: RadioTower },
+  { id: "channels", label: "Каналы", icon: Rss },
   { id: "bots", label: "Боты", icon: Bot },
-  { id: "chats", label: "Чаты", icon: MessagesSquare },
-  { id: "settings", label: "Настройки", icon: SlidersHorizontal },
+  { id: "chats", label: "Чаты", icon: MessageCircle },
+  { id: "settings", label: "Настройки", icon: Settings2 },
 ] as const;
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
@@ -33,15 +34,15 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
               onClick={() => onChange(id)}
               whileTap={springPress}
               className={`relative flex flex-col items-center justify-center gap-1 rounded-[20px] text-[10px] font-medium transition duration-200 ${selected
-                ? "bg-accent/10 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_18%,transparent),0_8px_20px_color-mix(in_srgb,var(--accent)_16%,transparent)]"
+                ? "bg-accent/10 text-accent"
                 : "text-muted hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] hover:text-ink"}`}
             >
-              <Icon size={18} strokeWidth={1.5} />
+              <Icon size={17} strokeWidth={1.4} />
               <span>{t(label)}</span>
               {selected && (
                 <motion.span
                   layoutId="bottom-nav-marker"
-                  className="absolute inset-x-[32%] top-1 h-0.5 rounded-full bg-accent shadow-[0_0_12px_var(--accent)]"
+                  className="absolute inset-x-[34%] top-1 h-0.5 rounded-full bg-accent shadow-[0_0_12px_var(--accent)]"
                   aria-hidden="true"
                   transition={{ type: "spring", stiffness: 420, damping: 32 }}
                 />

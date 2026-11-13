@@ -1,14 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="512" height="512" fill="none" role="img" aria-label="Aurogram">
+  <title>Aurogram</title>
   <defs>
-    <linearGradient id="violet" x1="91" y1="94" x2="421" y2="415" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#6366F1"/>
-      <stop offset="1" stop-color="#8B5CF6"/>
+    <linearGradient id="aurogram" x1="5" y1="27" x2="27" y2="5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2AABEE"/>
+      <stop offset="1" stop-color="#6366F1"/>
     </linearGradient>
-    <filter id="glow" x="20" y="18" width="472" height="476" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-      <feGaussianBlur stdDeviation="22"/>
+    <filter id="aurogram-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.6" flood-color="#8B5CF6" flood-opacity="0.55"/>
     </filter>
   </defs>
-  <rect width="512" height="512" rx="116" fill="#0A0A0B"/>
-  <path d="M99 416 256 86l157 330M157 297h198" stroke="url(#violet)" stroke-linecap="round" stroke-linejoin="round" stroke-width="76" opacity=".85" filter="url(#glow)"/>
-  <path d="M99 416 256 86l157 330M157 297h198" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="56"/>
+  <g filter="url(#aurogram-glow)">
+    <path d="M16 5.5 26.6 14.2 18.7 16.6Z" fill="url(#aurogram)" fill-opacity="0.36"/>
+    <path d="M16 5.5 5.4 14.2 13.3 16.6Z" fill="url(#aurogram)" fill-opacity="0.16"/>
+    <path d="M5.5 26.6 16 5.5 26.5 26.6" stroke="url(#aurogram)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M10.2 19.4h11.6" stroke="url(#aurogram)" stroke-width="2.1" stroke-linecap="round"/>
+  </g>
 </svg>

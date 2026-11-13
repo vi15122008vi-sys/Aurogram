@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, FolderPlus, MoreHorizontal, Search } from "lucide-react";
+import { Archive, ArchiveRestore, FolderPlus, MoreHorizontal, Phone, Search } from "lucide-react";
 import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { Skeleton } from "../components/Skeleton";
+import { openCall } from "../lib/callbus";
 import { useI18n } from "../lib/i18n";
 
 export type ChatFilter = "all" | "user" | "group" | "channel" | "archive";
@@ -240,7 +241,16 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
               </span>
             </button>
 
-            <div className="relative shrink-0">
+            <div className="relative flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                aria-label={t("Позвонить", "Call")}
+                title={t("Позвонить", "Call")}
+                onClick={() => openCall({ room: `chat:${chat.id}`, title: chat.title })}
+                className="grid size-8 place-items-center rounded-full text-muted transition hover:text-success sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+              >
+                <Phone size={15} strokeWidth={1.5} />
+              </button>
               <button
                 type="button"
                 aria-label={t("Действия чата")}

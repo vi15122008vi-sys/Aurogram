@@ -18,6 +18,7 @@ from app.api.ai import router as ai_router
 from app.api.auth import router as auth_router
 from app.api.bot import router as bot_router
 from app.api.bots import router as bots_router
+from app.api.calls import router as calls_router
 from app.api.channels import router as channels_router
 from app.api.chats import router as chats_router
 from app.api.editor import router as editor_router
@@ -27,6 +28,7 @@ from app.api.privacy import router as privacy_router
 from app.api.notifications import router as notifications_router
 from app.api.textstyles import router as textstyles_router
 from app.api.themes import router as themes_router
+from app.api.widgets import router as widgets_router
 from app.config import get_settings
 from app.database import init_db
 
@@ -106,6 +108,8 @@ for api_router in (
     notifications_router,
     bot_router,
     ai_router,
+    calls_router,
+    widgets_router,
     health_router,
 ):
     app.include_router(api_router, prefix="/api")

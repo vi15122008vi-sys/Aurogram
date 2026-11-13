@@ -238,6 +238,11 @@ export function messageThumbUrl(chatId: number, messageId: number): string {
   return apiUrl(`/messages/${chatId}/${messageId}/thumb`);
 }
 
+/** WebSocket-адрес сигналинга звонков (http → ws) на тот же бэкенд. */
+export function apiWsUrl(path: string): string {
+  return apiUrl(path).replace(/^http/, "ws");
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   let deviceId = localStorage.getItem("aurogram.device_id");
