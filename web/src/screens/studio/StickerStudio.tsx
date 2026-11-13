@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, ImagePlus, LoaderCircle, Send, Trash2, Upload } from "lucide-react";
-import { api } from "../../lib/api";
+import { BadgeCheck, Download, ImagePlus, LoaderCircle, Send, Trash2, Upload } from "lucide-react";
+import { api, type BotStatus } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 
 const MAX_SIDE = 512;
@@ -85,7 +85,17 @@ export function StickerStudio({ channelId }: { channelId: number }) {
   const [busy, setBusy] = useState<"processing" | "sending" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [bot, setBot] = useState<BotStatus | null>(null);
+  const [packName, setPackName] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    api.bot.status()
+      .then((status) => { if (active) setBot(status); })
+      .catch(() => { if (active) setBot(null); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!source) {
@@ -160,6 +170,34 @@ export function StickerStudio({ channelId }: { channelId: number }) {
   function addToPack() {
     if (!sticker) return;
     setPack((current) => [...current, sticker].slice(0, 24));
+  }
+
+  async function createPack() {
+    if (!pack.length) return;
+    const ownerId = bot?.allowed_user_ids?.[0];
+    if (!ownerId) {
+      setError(t("Сначала добавьте свой Telegram user_id в BOT_ALLOWED_USER_IDS на бэкенде", "Add your Telegram user_id to BOT_ALLOWED_USER_IDS on the backend first"));
+      return;
+    }
+    setBusy("sending");
+    setError(null);
+    setNotice(null);
+    try {
+      const files = await Promise.all(pack.map(async (item) => await (await fetch(item)).blob()));
+      const result = await api.bot.createStickerSet({
+        name: `aurogram_${channelId}_${Date.now().toString(36)}`,
+        title: `Aurogram Studio ${channelId}`,
+        emoji: "⭐",
+        ownerId,
+        files,
+      });
+      setPackName(result.name);
+      setNotice(`${t("Стикерпак создан", "Sticker pack created")}: ${result.count}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("Не удалось создать стикерпак", "Could not create the sticker pack"));
+    } finally {
+      setBusy(null);
+    }
   }
 
   function download() {
@@ -271,6 +309,27 @@ export function StickerStudio({ channelId }: { channelId: number }) {
             </span>
           ))}
           {!pack.length && <p className="py-2 text-[11px] text-muted">{t("Добавьте стикеры, чтобы собрать пак", "Add stickers to build a pack")}</p>}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={!pack.length || busy === "sending"}
+            onClick={() => void createPack()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface/60 px-3 text-xs font-medium text-ink transition hover:text-accent disabled:opacity-50"
+          >
+            <BadgeCheck size={14} />{t("Стикерпак в Telegram", "Sticker pack in Telegram")}
+          </button>
+          {bot?.configured && (
+            <span className="font-mono text-[10px] text-muted">
+              @{bot.username}{bot.allowed_user_ids.length ? "" : ` · ${t("добавьте свой user_id", "add your user_id")}`}
+            </span>
+          )}
+          {packName && (
+            <a href={`https://t.me/addstickers/${packName}`} target="_blank" rel="noreferrer" className="rounded-full bg-accent/10 px-3 py-1.5 text-[11px] font-medium text-accent">
+              t.me/addstickers/{packName}
+            </a>
+          )}
         </div>
       </div>
     </div>

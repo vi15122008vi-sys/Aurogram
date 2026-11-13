@@ -40,6 +40,19 @@ export interface BotRecord {
   webhook_set: boolean;
 }
 
+export interface BotStatus {
+  configured: boolean;
+  id?: number;
+  username?: string;
+  name?: string;
+  allowed_user_ids: number[];
+  internal_secret_set: boolean;
+  widget_base_url: string | null;
+  webhook_url?: string | null;
+  pending_updates?: number;
+  error?: string;
+}
+
 export interface ChatRecord {
   id: number;
   title: string;
@@ -346,6 +359,20 @@ export const api = {
   },
   bots: {
     list: () => request<BotRecord[]>("/bots"),
+  },
+  bot: {
+    status: () => request<BotStatus>("/bot/status"),
+    sendWidget: (payload: { channel: string; title: string; text: string; widget?: string }) =>
+      request<{ message_id: number; channel: string; widget: string | null }>("/bot/widgets/send", { method: "POST", body: json(payload) }),
+    createStickerSet: (payload: { name: string; title: string; emoji: string; ownerId?: number; files: Blob[] }) => {
+      const form = new FormData();
+      form.append("name", payload.name);
+      form.append("title", payload.title);
+      form.append("emoji", payload.emoji);
+      if (payload.ownerId) form.append("owner_id", String(payload.ownerId));
+      payload.files.forEach((file, index) => form.append("files", file, `sticker${index}.png`));
+      return request<{ name: string; title: string; count: number; owner_id: number }>("/bot/stickers/set", { method: "POST", body: form });
+    },
   },
   chats: {
     list: (archived = false) => request<ChatRecord[]>(`/chats?archived=${archived}`),

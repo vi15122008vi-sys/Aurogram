@@ -15,6 +15,7 @@ from starlette.staticfiles import StaticFiles
 from app.admin.routes import router as admin_router
 from app.api.accounts import router as accounts_router
 from app.api.auth import router as auth_router
+from app.api.bot import router as bot_router
 from app.api.bots import router as bots_router
 from app.api.channels import router as channels_router
 from app.api.chats import router as chats_router
@@ -91,6 +92,7 @@ for api_router in (
     textstyles_router,
     themes_router,
     notifications_router,
+    bot_router,
     health_router,
 ):
     app.include_router(api_router, prefix="/api")

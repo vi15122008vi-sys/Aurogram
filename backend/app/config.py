@@ -46,6 +46,20 @@ class Settings(BaseSettings):
     vapid_private_key: str = Field(default="", alias="VAPID_PRIVATE_KEY")
     vapid_subject: str = Field(default="mailto:admin@example.com", alias="VAPID_SUBJECT")
 
+    # --- Aurogram Studio bot ---
+    bot_token: str = Field(default="", alias="BOT_TOKEN")
+    bot_allowed_user_ids: str = Field(default="", alias="BOT_ALLOWED_USER_IDS")
+    bot_internal_secret: str = Field(default="", alias="BOT_INTERNAL_SECRET")
+    bot_widget_base_url: str = Field(default="", alias="BOT_WIDGET_BASE_URL")
+
+    def bot_allowed_ids(self) -> List[int]:
+        """BOT_ALLOWED_USER_IDS=111,222 — белый список Telegram user id."""
+        result: List[int] = []
+        for part in self.bot_allowed_user_ids.replace(" ", "").split(","):
+            if part.isdigit():
+                result.append(int(part))
+        return result
+
     @field_validator("allow_per_account_keys", mode="before")
     @classmethod
     def _parse_bool(cls, v: object) -> bool:
