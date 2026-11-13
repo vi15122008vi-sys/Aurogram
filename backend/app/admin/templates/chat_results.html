@@ -1,0 +1,18 @@
+<div class="flex flex-wrap items-center gap-1.5">
+  {% for key, label, count in type_filters %}
+  <a href="/admin/chats?account_id={{ account_id|urlencode }}&type={{ key }}"
+     hx-get="/admin/chats?account_id={{ account_id|urlencode }}&type={{ key }}"
+     hx-target="#chat-results" hx-swap="innerHTML" hx-push-url="true"
+     class="admin-chip {{ 'is-active' if active_type == key else '' }}">
+    {{ label }}<span class="font-mono text-[10px] opacity-60">{{ count }}</span>
+  </a>
+  {% endfor %}
+  <a href="/admin/export/chats.csv?account_id={{ account_id|urlencode }}&type={{ active_type }}" class="admin-btn ml-auto" download>
+    <svg viewBox="0 0 24 24" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/></svg>
+    Экспорт в CSV
+  </a>
+</div>
+<p class="mt-2 text-[11px] text-zinc-500">Показано {{ shown }} из {{ total }}</p>
+<div class="mt-2">
+  {% include "chat_list.html" %}
+</div>

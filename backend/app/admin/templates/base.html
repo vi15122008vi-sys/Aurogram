@@ -3,40 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0a0b">
+  <meta name="theme-color" content="#09090b">
   <title>{{ title|default('Aurogram Admin') }} · Aurogram</title>
   <link rel="stylesheet" href="/admin/static/admin.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/json-enc.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <style>[x-cloak] { display: none !important; }</style>
 </head>
-<body class="admin-body min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-  <div class="min-h-screen lg:grid lg:grid-cols-[220px_1fr]">
-    <aside class="admin-glass admin-sidebar border-b border-white/10 p-4 lg:min-h-screen lg:border-b-0 lg:border-r">
-      <a href="/admin" class="flex items-center gap-3 text-lg font-semibold">
-        <span class="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500 text-sm">A</span>
+<body
+  class="admin-body min-h-screen bg-zinc-950 text-zinc-100 antialiased"
+  x-data="{ palette: false }"
+  @keydown.window.prevent.cmd.k="palette = true; $nextTick(() => $refs.query && $refs.query.focus())"
+  @keydown.window.prevent.ctrl.k="palette = true; $nextTick(() => $refs.query && $refs.query.focus())"
+  @keydown.window.escape="palette = false"
+>
+  <div class="min-h-screen lg:grid lg:grid-cols-[206px_1fr]">
+    <aside class="admin-glass admin-sidebar border-b border-white/[0.06] px-2.5 py-4 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
+      <a href="/admin" class="flex items-center gap-2.5 px-2 py-1.5 text-[15px] font-semibold tracking-tight text-white">
+        <span class="grid size-7 place-items-center rounded-[9px] bg-indigo-500 text-[13px] font-bold text-white">A</span>
         Aurogram
       </a>
-      <nav class="mt-8 grid grid-cols-2 gap-1 lg:grid-cols-1">
-        <a href="/admin" class="rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5">Обзор</a>
+
+      <nav class="mt-5 grid gap-0.5" aria-label="Разделы админки">
+        <a href="/admin" class="admin-nav-item {{ 'is-active' if page == 'dashboard' else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ icons.get('dashboard', '')|safe }}</svg>
+          <span>Обзор</span>
+        </a>
         {% for key, label in pages.items() %}
-        <a href="/admin/{{ key }}" class="rounded-lg px-3 py-2 text-sm {{ 'bg-white/10 text-white' if page == key else 'text-zinc-400 hover:bg-white/5 hover:text-white' }}">{{ label }}</a>
+        <a href="/admin/{{ key }}" class="admin-nav-item {{ 'is-active' if page == key else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ icons.get(key, '')|safe }}</svg>
+          <span class="truncate">{{ label }}</span>
+        </a>
         {% endfor %}
       </nav>
-      <form method="post" action="/admin/logout" class="mt-8">
-        <button class="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-zinc-400 hover:bg-white/5">Выйти</button>
+
+      <form method="post" action="/admin/logout" class="mt-5 border-t border-white/[0.06] pt-3">
+        <button class="admin-nav-item w-full text-left">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ icons.get('logout', '')|safe }}</svg>
+          <span>Выйти</span>
+        </button>
       </form>
     </aside>
-    <main class="admin-main min-w-0 p-5 md:p-8">
-      <header class="admin-glass admin-topbar mb-7 flex items-center justify-between border-b border-white/10 px-4 py-4">
-        <div>
-          <p class="text-xs uppercase tracking-wider text-zinc-500">Aurogram / Admin</p>
-          <h1 class="mt-1 text-2xl font-semibold">{{ title|default('Обзор') }}</h1>
+
+    <main class="admin-main min-w-0 p-3.5 md:p-6">
+      <header class="admin-glass admin-topbar mb-6 flex items-center gap-3 px-3.5 py-3">
+        <div class="min-w-0">
+          <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">Aurogram / Admin</p>
+          <h1 class="mt-0.5 truncate text-xl font-semibold">{{ title|default('Обзор') }}</h1>
         </div>
-        <span class="rounded-md border border-white/10 px-2 py-1 font-mono text-xs text-zinc-400">API :8000</span>
+
+        <button
+          type="button"
+          @click="palette = true; $nextTick(() => $refs.query && $refs.query.focus())"
+          class="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-zinc-400 transition hover:border-indigo-400/30 hover:text-white"
+          aria-label="Глобальный поиск"
+        >
+          <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+          <span class="hidden sm:inline">Поиск по кэшу</span>
+          <kbd class="rounded border border-white/10 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">⌘K</kbd>
+        </button>
+        <span class="hidden shrink-0 rounded-full border border-white/[0.08] px-2.5 py-1 font-mono text-[10px] text-zinc-500 md:inline">API :8000</span>
       </header>
+
       {% block content %}{% endblock %}
     </main>
+  </div>
+
+  {# Палитра команд: поиск по чатам и сообщениям через HTMX. #}
+  <div x-show="palette" x-cloak class="fixed inset-0 z-50 px-3 pt-[10vh]" role="dialog" aria-modal="true" aria-label="Глобальный поиск">
+    <div class="absolute inset-0 bg-black/65 backdrop-blur-sm" @click="palette = false"></div>
+    <div class="relative mx-auto w-[min(660px,100%)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl">
+      <div class="flex items-center gap-2.5 border-b border-white/[0.06] px-4 py-3">
+        <svg viewBox="0 0 24 24" class="size-4 shrink-0 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+        <input
+          x-ref="query"
+          type="search"
+          name="q"
+          autocomplete="off"
+          placeholder="Чаты, сообщения, username…"
+          aria-label="Поиск по чатам и сообщениям"
+          class="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+          hx-get="/admin/search"
+          hx-trigger="input changed delay:220ms, search"
+          hx-target="#search-results"
+          hx-swap="innerHTML"
+        >
+        <kbd class="shrink-0 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">Esc</kbd>
+      </div>
+      <div id="search-results" class="max-h-[54vh] overflow-y-auto p-2">
+        <p class="p-6 text-center text-sm text-zinc-500">Начните вводить запрос — минимум два символа.</p>
+      </div>
+    </div>
   </div>
 </body>
 </html>

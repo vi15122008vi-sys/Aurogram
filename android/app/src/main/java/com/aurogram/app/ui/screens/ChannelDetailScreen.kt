@@ -36,6 +36,7 @@ import com.aurogram.app.ui.components.toAurogramMessage
 import com.aurogram.app.ui.theme.AurogramShapes
 import com.aurogram.app.ui.theme.AurogramTypography
 import com.aurogram.app.ui.theme.LocalAurogramColors
+import com.aurogram.app.ui.theme.glassSurface
 
 private val channelTabs = listOf("Посты", "Статистика", "Антиспам", "Настройки")
 
@@ -44,6 +45,7 @@ fun ChannelDetailScreen(
     channelId: Long,
     onBack: () -> Unit,
     onOpenPostEditor: (Long) -> Unit,
+    onOpenStudio: (Long, String) -> Unit = { _, _ -> },
     api: AurogramApi = RetrofitProvider.api,
 ) {
     val colors = LocalAurogramColors.current
@@ -77,6 +79,15 @@ fun ChannelDetailScreen(
                 BasicText(channel?.title ?: "Канал", style = AurogramTypography.Display.copy(color = colors.ink))
                 Spacer(Modifier.size(4.dp))
                 BasicText(channel?.username?.let { "@$it" } ?: "CHANNEL / $channelId", style = AurogramTypography.Mono.copy(color = colors.muted))
+                Spacer(Modifier.size(12.dp))
+                Box(
+                    modifier = Modifier
+                        .glassSurface(colors, AurogramShapes.Card)
+                        .clickable { onOpenStudio(channelId, channel?.title ?: "Канал") }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    BasicText("Студия  →", style = AurogramTypography.Label.copy(color = colors.accent))
+                }
             }
             AurogramTabRow(channelTabs, selectedTab) { selectedTab = it }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {

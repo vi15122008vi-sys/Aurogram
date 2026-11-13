@@ -1,11 +1,11 @@
 {% extends "base.html" %}{% block content %}
-<section class="space-y-5">
-  <div class="max-w-xl rounded-xl border border-white/10 bg-zinc-900/50 p-4">
-    <label for="account-picker" class="mb-2 block text-xs font-medium uppercase tracking-wide text-zinc-500">Аккаунт Telegram</label>
+<section class="space-y-4">
+  <div class="admin-card max-w-xl">
+    <label for="account-picker" class="mb-2 block font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Аккаунт Telegram</label>
     <select id="account-picker" name="account_id"
-            hx-get="/admin/chats" hx-trigger="change" hx-target="#chat-results"
-            hx-include="this" hx-push-url="true"
-            class="w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-indigo-400">
+            hx-get="/admin/chats" hx-trigger="change" hx-target="#chat-results" hx-swap="innerHTML"
+            hx-include="this" hx-vals='{"type": "{{ active_type }}"}' hx-push-url="true"
+            class="w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none transition focus:border-indigo-400/60">
       <option value="">Выберите аккаунт</option>
       {% for account in accounts %}
       <option value="{{ account.id }}" {{ 'selected' if account.id == selected_account_id else '' }}>{{ account.name or account.phone }} · {{ account.phone }}</option>
@@ -13,7 +13,7 @@
     </select>
   </div>
   <div id="chat-results">
-    {% include "chat_list.html" %}
+    {% include "chat_results.html" %}
   </div>
 </section>
 {% endblock %}

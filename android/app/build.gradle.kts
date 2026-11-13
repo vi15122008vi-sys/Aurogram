@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val releaseApiBaseUrl = providers.gradleProperty("AUROGRAM_API_BASE_URL").orElse("https://api.aurogram.app/api/").get()
+val releaseApiBaseUrl = providers.gradleProperty("AUROGRAM_API_BASE_URL").orElse("https://aurogram.dpdns.org/api/").get()
 val debugApiBaseUrl = providers.gradleProperty("AUROGRAM_DEBUG_API_BASE_URL").orElse("http://10.0.2.2:8000/api/").get()
 
 android {

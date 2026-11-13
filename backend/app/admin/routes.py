@@ -44,6 +44,27 @@ PAGES = {
     "settings": "Настройки",
 }
 
+# Иконки сайдбара: компактные stroke-SVG в духе Linear.
+ICONS = {
+    "dashboard": '<path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/>',
+    "accounts": '<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7.5" r="3"/>',
+    "channels": '<circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4"/>',
+    "bots": '<rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 8V5"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/>',
+    "chats": '<path d="M4 6h16v10H8l-4 4z"/>',
+    "media": '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-5 4 4 3-3 3 3"/>',
+    "stats": '<path d="M4 19V5M4 19h16"/><path d="M8 15v-4M12 15V8M16 15v-6"/>',
+    "export": '<path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/>',
+    "system": '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/>',
+    "logs": '<path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    "antispam": '<path d="M12 4l7 3v5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V7z"/>',
+    "stopwords": '<circle cx="12" cy="12" r="8"/><path d="m7 7 10 10"/>',
+    "editor": '<path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4 16z"/>',
+    "themes": '<circle cx="12" cy="12" r="8"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/><circle cx="12" cy="15" r="1"/>',
+    "cache": '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/>',
+    "settings": '<path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/>',
+    "logout": '<path d="M15 12H4"/><path d="m9 8-4 4 4 4"/><path d="M14 5h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4"/>',
+}
+
 
 def _admin_session(request: Request) -> bool:
     return bool(request.session.get("admin_authenticated"))
@@ -58,8 +79,129 @@ def _page_response(request: Request, page: str, data: dict[str, Any] | None = No
             "page": page,
             "title": PAGES.get(page, "Обзор"),
             "pages": PAGES,
+            "icons": ICONS,
             **(data or {}),
         },
+    )
+
+
+def _num(value: Any) -> str:
+    try:
+        return f"{int(value):,}".replace(",", "\u202f")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+templates.env.filters["num"] = _num
+
+
+def _dir_size(path: Path) -> int:
+    total = 0
+    if not path.exists():
+        return 0
+    for item in path.rglob("*"):
+        try:
+            if item.is_file():
+                total += item.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+async def _dashboard_cards() -> dict[str, Any]:
+    """Счётчики дашборда: каналы, боты, сообщения в кэше, размер медиа."""
+    accounts = await fetchall("SELECT id FROM accounts")
+    channel_ids = await fetchall("SELECT DISTINCT channel_id FROM channel_settings")
+    bots = await fetchall("SELECT id FROM bots")
+
+    messages = 0
+    media_files = 0
+    media_indexed = 0
+    for account in accounts:
+        try:
+            conn = await connect_cache(account["id"])
+        except Exception:
+            continue
+        try:
+            cursor = await conn.execute("SELECT COUNT(*) AS c FROM cached_messages")
+            messages += int((await cursor.fetchone())["c"] or 0)
+            cursor = await conn.execute(
+                "SELECT COUNT(*) AS c, COALESCE(SUM(size_bytes), 0) AS s FROM cached_media"
+            )
+            row = await cursor.fetchone()
+            media_files += int(row["c"] or 0)
+            media_indexed += int(row["s"] or 0)
+        except Exception:
+            continue
+        finally:
+            await conn.close()
+
+    settings = get_settings()
+    media_disk = _dir_size(Path(settings.media_dir))
+    cache_disk = _dir_size(Path(settings.cache_dir))
+    media_bytes = max(media_disk, media_indexed)
+    return {
+        "channel_total": len(channel_ids),
+        "bot_total": len(bots),
+        "message_total": messages,
+        "media_bytes": media_bytes,
+        "media_files": media_files,
+        "cache_bytes": cache_disk,
+        "account_total": len(accounts),
+    }
+
+
+async def _search_cached(needle: str, per_account: int = 6) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Глобальный поиск по кэшу: чаты и сообщения (регистронезависимо, вкл. кириллицу)."""
+    term = needle.strip().lower()
+    chats: list[dict[str, Any]] = []
+    messages: list[dict[str, Any]] = []
+    if len(term) < 2:
+        return chats, messages
+    accounts = await fetchall("SELECT id, name FROM accounts")
+    for account in accounts:
+        try:
+            conn = await connect_cache(account["id"])
+        except Exception:
+            continue
+        try:
+            cursor = await conn.execute("SELECT id, type, title, username FROM cached_chats LIMIT 3000")
+            for row in await cursor.fetchall():
+                haystack = f"{row['title'] or ''} {row['username'] or ''}".lower()
+                if term in haystack:
+                    chats.append({**dict(row), "account_id": account["id"], "account_name": account["name"]})
+                    if len(chats) >= per_account * len(accounts):
+                        break
+
+            cursor = await conn.execute(
+                "SELECT chat_id, id, text, date, media_type FROM cached_messages "
+                "WHERE text IS NOT NULL ORDER BY date DESC LIMIT 1500"
+            )
+            found = 0
+            for row in await cursor.fetchall():
+                if term in (row["text"] or "").lower():
+                    messages.append({**dict(row), "account_id": account["id"], "account_name": account["name"]})
+                    found += 1
+                    if found >= per_account:
+                        break
+        except Exception:
+            continue
+        finally:
+            await conn.close()
+    chats.sort(key=lambda item: (item.get("type") or "", item.get("title") or ""))
+    messages.sort(key=lambda item: item.get("date") or "", reverse=True)
+    return chats, messages
+
+
+def _csv_response(rows: list[dict[str, Any]], fields: list[str], filename: str) -> Response:
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -97,13 +239,13 @@ async def _page_data(page: str) -> dict[str, Any]:
     settings = get_settings()
     if page == "dashboard":
         accounts = await fetchall("SELECT id, name, phone, auth_state, last_sync FROM accounts ORDER BY created_at DESC LIMIT 8")
-        bots = await fetchall("SELECT id FROM bots")
-        channels = await fetchall("SELECT channel_id FROM channel_settings")
+        stats = await _dashboard_cards()
         return {
             "accounts": [dict(row) for row in accounts],
-            "account_count": len(await fetchall("SELECT id FROM accounts")),
-            "bot_count": len(bots),
-            "channel_count": len(channels),
+            "account_count": stats["account_total"],
+            "bot_count": stats["bot_total"],
+            "channel_count": stats["channel_total"],
+            "stats": stats,
             "listener": await get_listener_heartbeat(),
         }
     if page == "accounts":
@@ -354,8 +496,21 @@ async def admin_media(
     )
 
 
+CHAT_TYPE_FILTERS = [
+    ("all", "Все"),
+    ("channel", "Каналы"),
+    ("group", "Группы"),
+    ("user", "Личные"),
+    ("bot", "Боты"),
+]
+
+
 @router.get("/chats", response_class=HTMLResponse)
-async def admin_chats(request: Request, account_id: str | None = None) -> Response:
+async def admin_chats(
+    request: Request,
+    account_id: str | None = None,
+    chat_type: str = Query(default="all", alias="type"),
+) -> Response:
     if not _admin_session(request):
         return RedirectResponse("/admin/login", status_code=303)
     accounts = [dict(row) for row in await fetchall(
@@ -364,16 +519,33 @@ async def admin_chats(request: Request, account_id: str | None = None) -> Respon
     valid_ids = {account["id"] for account in accounts}
     selected_account_id = account_id if account_id in valid_ids else ""
     rows = await _admin_chat_rows(selected_account_id) if selected_account_id else []
+
+    counts: dict[str, int] = {"all": len(rows)}
+    for row in rows:
+        key = str(row.get("type") or "other")
+        counts[key] = counts.get(key, 0) + 1
+    allowed = {key for key, _ in CHAT_TYPE_FILTERS}
+    active_type = chat_type if chat_type in allowed else "all"
+    visible = rows if active_type == "all" else [row for row in rows if row.get("type") == active_type]
+
+    context: dict[str, Any] = {
+        "rows": visible,
+        "account_id": selected_account_id,
+        "active_type": active_type,
+        "type_filters": [(key, label, counts.get(key, 0)) for key, label in CHAT_TYPE_FILTERS],
+        "total": len(rows),
+        "shown": len(visible),
+    }
     if request.headers.get("HX-Request") == "true":
         return templates.TemplateResponse(
             request=request,
-            name="chat_list.html",
-            context={"request": request, "rows": rows, "account_id": selected_account_id},
+            name="chat_results.html",
+            context={"request": request, **context},
         )
     return _page_response(request, "chats", {
         "accounts": accounts,
         "selected_account_id": selected_account_id,
-        "rows": rows,
+        **context,
     })
 
 
@@ -533,6 +705,103 @@ async def export_messages_csv(request: Request) -> Response:
         content=output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="aurogram-messages.csv"'},
+    )
+
+
+@router.get("/search", response_class=HTMLResponse)
+async def admin_search(request: Request, q: str = Query(default="", max_length=120)) -> Response:
+    """Фрагмент для палитры ⌘K: чаты и сообщения из кэша."""
+    if not _admin_session(request):
+        return HTMLResponse("", status_code=401)
+    chats, messages = await _search_cached(q)
+    return templates.TemplateResponse(
+        request=request,
+        name="search_results.html",
+        context={"request": request, "q": q, "chats": chats, "messages": messages},
+    )
+
+
+@router.get("/accounts", response_class=HTMLResponse)
+async def admin_accounts(request: Request, state: str = "all") -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    rows = [
+        dict(row)
+        for row in await fetchall(
+            "SELECT id, phone, name, username, auth_state, created_at, last_sync "
+            "FROM accounts ORDER BY created_at DESC"
+        )
+    ]
+    authorized = sum(1 for row in rows if (row.get("auth_state") or "") == "authorized")
+    counts = {"all": len(rows), "authorized": authorized, "pending": len(rows) - authorized}
+    active_state = state if state in counts else "all"
+    if active_state == "authorized":
+        visible = [row for row in rows if (row.get("auth_state") or "") == "authorized"]
+    elif active_state == "pending":
+        visible = [row for row in rows if (row.get("auth_state") or "") != "authorized"]
+    else:
+        visible = rows
+
+    context: dict[str, Any] = {
+        "rows": visible,
+        "active_state": active_state,
+        "state_filters": [
+            ("all", "Все", counts["all"]),
+            ("authorized", "Активные", counts["authorized"]),
+            ("pending", "Ожидают", counts["pending"]),
+        ],
+        "total": len(rows),
+        "shown": len(visible),
+    }
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request=request,
+            name="accounts_table.html",
+            context={"request": request, **context},
+        )
+    return _page_response(request, "accounts", context)
+
+
+@router.get("/export/chats.csv")
+async def export_chats_csv(
+    request: Request,
+    account_id: str = "",
+    chat_type: str = Query(default="all", alias="type"),
+) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    rows = await _admin_chat_rows(account_id) if account_id else []
+    if chat_type != "all":
+        rows = [row for row in rows if row.get("type") == chat_type]
+    for row in rows:
+        row["account_id"] = account_id
+        row["last_message"] = row.get("last_message") or ""
+    return _csv_response(
+        rows,
+        ["account_id", "id", "type", "title", "username", "unread", "last_message_date", "last_message"],
+        "aurogram-chats.csv",
+    )
+
+
+@router.get("/export/accounts.csv")
+async def export_accounts_csv(request: Request, state: str = "all") -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    rows = [
+        dict(row)
+        for row in await fetchall(
+            "SELECT id, phone, name, username, auth_state, created_at, last_sync "
+            "FROM accounts ORDER BY created_at DESC"
+        )
+    ]
+    if state == "authorized":
+        rows = [row for row in rows if (row.get("auth_state") or "") == "authorized"]
+    elif state == "pending":
+        rows = [row for row in rows if (row.get("auth_state") or "") != "authorized"]
+    return _csv_response(
+        rows,
+        ["id", "phone", "name", "username", "auth_state", "created_at", "last_sync"],
+        "aurogram-accounts.csv",
     )
 
 

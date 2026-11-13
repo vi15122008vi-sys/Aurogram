@@ -1,5 +1,6 @@
 package com.aurogram.app.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,24 +8,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import android.net.Uri
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aurogram.app.ui.components.BottomNavBar
-import com.aurogram.app.ui.screens.RootScreen
-import com.aurogram.app.ui.screens.BotsScreen
 import com.aurogram.app.ui.screens.BotDetailScreen
+import com.aurogram.app.ui.screens.BotsScreen
 import com.aurogram.app.ui.screens.ChannelDetailScreen
 import com.aurogram.app.ui.screens.ChannelsScreen
 import com.aurogram.app.ui.screens.ChatsScreen
 import com.aurogram.app.ui.screens.MessageListScreen
 import com.aurogram.app.ui.screens.PostEditorScreen
+import com.aurogram.app.ui.screens.SettingsScreen
+import com.aurogram.app.ui.screens.StudioScreen
+import com.aurogram.app.ui.theme.AurogramThemeId
 import com.aurogram.app.ui.theme.LocalAurogramColors
 
 @Composable
-fun NavGraph() {
+fun NavGraph(
+    themeId: AurogramThemeId = AurogramThemeId.AurogramDark,
+    onThemeChange: (AurogramThemeId) -> Unit = {},
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val colors = LocalAurogramColors.current
@@ -44,6 +49,16 @@ fun NavGraph() {
                     channelId = channelId,
                     onBack = { navController.popBackStack() },
                     onOpenPostEditor = { id -> navController.navigate("post/$id") },
+                    onOpenStudio = { id, title -> navController.navigate("studio/$id/${Uri.encode(title)}") },
+                )
+            }
+            composable("studio/{channelId}/{title}") { entry ->
+                val channelId = entry.arguments?.getString("channelId")?.toLongOrNull() ?: return@composable
+                val title = entry.arguments?.getString("title")?.let { Uri.decode(it) }.orEmpty()
+                StudioScreen(
+                    channelId = channelId,
+                    channelTitle = title.ifBlank { "Канал" },
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable("post/{channelId}") { entry ->
@@ -65,7 +80,9 @@ fun NavGraph() {
                 val title = entry.arguments?.getString("title")?.let { Uri.decode(it) }.orEmpty()
                 MessageListScreen(chatId = chatId, title = title, onBack = { navController.popBackStack() })
             }
-            composable("settings") { RootScreen("Настройки", "PREFERENCES", "Настроек нет") }
+            composable("settings") {
+                SettingsScreen(themeId = themeId, onThemeChange = onThemeChange)
+            }
         }
         BottomNavBar(navController = navController, destination = backStackEntry?.destination)
     }
