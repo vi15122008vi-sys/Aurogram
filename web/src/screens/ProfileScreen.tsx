@@ -4,6 +4,7 @@ import {
   Bot, CalendarDays, Download, Loader2, LogOut, MessageSquare, Pencil, Radio, Send, Sparkles, Users, X,
 } from "lucide-react";
 import { api, storyAvatarUrl, type AiAnswer, type AuthAccount, type ChannelRecord, type MyProfile, type StoryPeer } from "../lib/api";
+import { GlassButton } from "../components/Buttons";
 import { springModal } from "../lib/motion";
 import { useI18n } from "../lib/i18n";
 
@@ -158,20 +159,12 @@ export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 pb-1">
-            <button
-              type="button"
-              onClick={() => setEditOpen(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[11px] font-semibold text-white transition hover:bg-accent-strong"
-            >
+            <GlassButton tone="accent" onClick={() => setEditOpen(true)} className="h-9 px-3.5 text-[11px] font-semibold">
               <Pencil size={13} />{t("Редактировать профиль")}
-            </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-danger/10 px-3.5 text-[11px] font-medium text-danger transition hover:bg-danger/15"
-            >
+            </GlassButton>
+            <GlassButton tone="danger" onClick={onLogout} className="h-9 px-3.5 text-[11px] font-medium">
               <LogOut size={13} />{t("Выйти")}
-            </button>
+            </GlassButton>
           </div>
         </div>
         {me?.profile.bio && <p className="px-4 pb-4 text-sm leading-6 text-ink/85">{me.profile.bio}</p>}

@@ -3,6 +3,7 @@ import { Archive, ArchiveRestore, Check, FolderPlus, MessageCircle, MoreHorizont
 import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { Fab } from "../components/Fab";
+import { GlassButton } from "../components/Buttons";
 import { StoryViewer } from "../components/StoryViewer";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { Skeleton } from "../components/Skeleton";
@@ -343,8 +344,9 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
                 <X size={14} />
               </button>
             </div>
-            <button
-              type="button"
+            <GlassButton
+              tone="glass"
+              className="mt-4 h-auto w-full justify-start gap-3 p-3 text-left"
               onClick={() => {
                 setComposeOpen(false);
                 requestAnimationFrame(() => {
@@ -352,14 +354,13 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
                   searchRef.current?.focus();
                 });
               }}
-              className="mt-4 flex w-full items-center gap-3 rounded-[18px] bg-surface/60 p-3 text-left transition hover:bg-accent/10"
             >
               <span className="grid size-9 place-items-center rounded-[12px] bg-accent/15 text-accent"><MessageCircle size={15} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-ink">{t("Написать сообщение")}</span>
                 <span className="block text-[11px] text-muted">{t("Поиск контактов и чатов", "Search contacts and chats")}</span>
               </span>
-            </button>
+            </GlassButton>
           </div>
         </div>
       )}

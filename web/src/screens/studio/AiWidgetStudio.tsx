@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Check, Copy, Loader2, Sparkles, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
+import { GlassButton } from "../../components/Buttons";
 import { springModal } from "../../lib/motion";
 
 interface AiWidgetStudioProps {
@@ -57,9 +58,9 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
           <p className="text-sm font-semibold text-ink">{t("Создать с AI")}</p>
           <p className="mt-0.5 text-[11px] text-muted">{t("Опишите виджет словами — AI соберёт HTML с инлайн-стилями и логикой.", "Describe a widget — AI builds self-contained HTML.")}</p>
         </div>
-        <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[11px] font-semibold text-white transition hover:bg-accent-strong">
+        <GlassButton tone="accent" onClick={() => setOpen(true)} className="h-9 px-3.5 text-[11px] font-semibold">
           <Sparkles size={13} />{t("Создать с AI")}
-        </button>
+        </GlassButton>
       </section>
 
       <AnimatePresence>
@@ -136,10 +137,10 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
                       {widgetUrl ? <a href={widgetUrl} target="_blank" rel="noreferrer" className="text-accent underline">{widgetUrl}</a> : `${html.length} ${t("символов", "chars")}`}
                     </span>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => void copyHtml()} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface/60 px-3.5 text-[11px] font-medium text-ink transition hover:text-accent">
+                      <GlassButton tone="glass" onClick={() => void copyHtml()} className="h-9 px-3.5 text-[11px] font-medium">
                         {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
                         {copied ? t("Скопировано") : t("Скопировать HTML")}
-                      </button>
+                      </GlassButton>
                     </div>
                   </div>
                   <p className="text-[10px] leading-4 text-muted">
