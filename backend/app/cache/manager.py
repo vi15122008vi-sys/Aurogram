@@ -304,6 +304,56 @@ async def search_cached(account_id: str, query: str, limit: int = 40) -> dict[st
         await conn.close()
 
 
+async def chat_message_count(account_id: str, chat_id: int) -> int:
+    """Сколько сообщений этого чата лежит в кэше."""
+    conn = await connect_cache(account_id)
+    try:
+        cursor = await conn.execute(
+            "SELECT COUNT(*) FROM cached_messages WHERE chat_id = ?", (chat_id,)
+        )
+        row = await cursor.fetchone()
+        return int(row[0] or 0) if row else 0
+    finally:
+        await conn.close()
+
+
+async def prune_chat_messages(account_id: str, chat_id: int, keep: int = 1000) -> int:
+    """Оставить только `keep` последних сообщений чата (защита диска)."""
+    keep = max(50, int(keep))
+    conn = await connect_cache(account_id)
+    try:
+        cursor = await conn.execute(
+            """
+            DELETE FROM cached_messages
+            WHERE chat_id = ?
+              AND id NOT IN (
+                  SELECT id FROM cached_messages
+                  WHERE chat_id = ?
+                  ORDER BY date DESC, id DESC
+                  LIMIT ?
+              )
+            """,
+            (chat_id, chat_id, keep),
+        )
+        await conn.commit()
+        return int(cursor.rowcount or 0)
+    finally:
+        await conn.close()
+
+
+async def clear_chat_messages(account_id: str, chat_id: int) -> int:
+    """Полностью очистить кэш сообщений одного чата."""
+    conn = await connect_cache(account_id)
+    try:
+        cursor = await conn.execute(
+            "DELETE FROM cached_messages WHERE chat_id = ?", (chat_id,)
+        )
+        await conn.commit()
+        return int(cursor.rowcount or 0)
+    finally:
+        await conn.close()
+
+
 async def purge_account_cache(account_id: str) -> None:
     import shutil
 

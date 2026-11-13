@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # При превышении лимита по умолчанию вытесняем только медиа (LRU):
     # сообщения — это история пользователя, их удаление включается явно.
     cache_evict_messages: bool = Field(default=False, alias="CACHE_EVICT_MESSAGES")
+    # Сколько последних сообщений хранить на каждый чат (защита диска).
+    cache_max_messages_per_chat: int = Field(default=1000, alias="CACHE_MAX_MESSAGES_PER_CHAT")
 
     admin_user: str = Field(default="admin", alias="ADMIN_USER")
     admin_password: str = Field(default="change-me", alias="ADMIN_PASSWORD")
@@ -56,6 +58,7 @@ class Settings(BaseSettings):
     bot_widget_base_url: str = Field(default="", alias="BOT_WIDGET_BASE_URL")
 
     # --- AI (суммаризация постов через бесплатную LLM) ---
+    deepseek_api_key: str = Field(default="", alias="DEEPSEEK_API_KEY")
     ai_api_key: str = Field(default="", alias="AI_API_KEY")
     ai_base_url: str = Field(default="https://api.deepseek.com", alias="AI_BASE_URL")
     ai_model: str = Field(default="deepseek-chat", alias="AI_MODEL")

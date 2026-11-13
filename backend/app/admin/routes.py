@@ -15,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.antispam.log import read_log
 from app.admin.exporter import build_channel_html
-from app.cache.manager import connect_cache, touch_cached_media
+from app.cache.manager import chat_message_count, clear_chat_messages, connect_cache, touch_cached_media
 from app.cache.index import get_listener_heartbeat
 from app.cache.stats import global_stats, growth_30d
 from app.config import get_settings
@@ -687,6 +687,7 @@ async def admin_chat(
     chat_id: int,
     account_id: str = "",
     fetched: int | None = None,
+    cleared: int | None = None,
 ) -> Response:
     if not _admin_session(request):
         return RedirectResponse("/admin/login", status_code=303)
@@ -707,14 +708,17 @@ async def admin_chat(
     chat = dict(chat_row)
     chat["title"] = chat.get("title") or str(chat_id)
     messages, has_more = await _admin_message_page(account_id, chat_id, 0)
+    cached_count = await chat_message_count(account_id, chat_id)
     return _page_response(request, "chat_reader", {
         "account": account,
+        "cached_count": cached_count,
         "account_id": account_id,
         "chat": chat,
         "messages": messages,
         "has_more": has_more,
         "next_offset": len(messages),
         "fetched": fetched,
+        "cleared": cleared,
     })
 
 
@@ -723,7 +727,7 @@ async def admin_fetch_chat_history(
     request: Request,
     chat_id: int,
     account_id: str = Form(...),
-    limit: int = Form(default=150, ge=1, le=1000),
+    limit: int = Form(default=100, ge=1, le=5000),
 ) -> Response:
     if not _admin_session(request):
         return RedirectResponse("/admin/login", status_code=303)
@@ -732,6 +736,20 @@ async def admin_fetch_chat_history(
         return HTMLResponse("Аккаунт не найден", status_code=404)
     fetched = await fetch_chat_history(account, chat_id, limit=limit)
     query = urlencode({"account_id": account_id, "fetched": fetched})
+    return RedirectResponse(f"/admin/chat/{chat_id}?{query}", status_code=303)
+
+
+@router.post("/chat/{chat_id}/clear")
+async def admin_clear_chat_cache(
+    request: Request,
+    chat_id: int,
+    account_id: str = Form(...),
+) -> Response:
+    """Удалить из SQLite все сообщения выбранного чата."""
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    removed = await clear_chat_messages(account_id, chat_id)
+    query = urlencode({"account_id": account_id, "cleared": removed})
     return RedirectResponse(f"/admin/chat/{chat_id}?{query}", status_code=303)
 
 

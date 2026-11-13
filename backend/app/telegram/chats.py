@@ -7,8 +7,9 @@ from telethon.tl.types import Channel, Chat, User
 from telethon import utils
 from telethon.tl.functions.stories import GetAllStoriesRequest, GetPeerStoriesRequest, ReadStoriesRequest
 
+from app.config import get_settings
 from app.models import ChatOut
-from app.cache.manager import upsert_message
+from app.cache.manager import prune_chat_messages, upsert_message
 from app.telegram.client import get_client
 from app.telegram.floodwait import with_floodwait
 
@@ -229,11 +230,46 @@ async def get_chat(account: dict, chat_id: int) -> Optional[ChatOut]:
     )
 
 
-async def fetch_chat_history(account: dict, chat_id: int, limit: int = 150) -> int:
-    """Fetch the latest messages for a chat and persist them to its local cache."""
+HISTORY_BATCH_SIZE = 100
+HISTORY_MAX_LIMIT = 5000
+
+
+async def fetch_chat_history(
+    account: dict,
+    chat_id: int,
+    limit: int = 100,
+    keep: Optional[int] = None,
+) -> int:
+    """Загрузка истории батчами по 100 сообщений с обрезкой кэша чата.
+
+    Батчи спасают от FloodWait (каждый вызов идёт через with_floodwait),
+    а prune_chat_messages не даёт кэшу разрастаться: в чате остаётся
+    не больше `keep` сообщений (по умолчанию CACHE_MAX_MESSAGES_PER_CHAT).
+    """
+    settings = get_settings()
+    limit = max(1, min(int(limit or 100), HISTORY_MAX_LIMIT))
+    keep = int(keep or settings.cache_max_messages_per_chat)
     client = await get_client(account["id"], account)
-    messages = await with_floodwait(lambda: client.get_messages(chat_id, limit=limit))
-    ordered = list(reversed(messages or []))
-    for message in ordered:
-        await upsert_message(account["id"], chat_id, message)
-    return len(ordered)
+
+    fetched = 0
+    offset_id = 0
+    while fetched < limit:
+        batch = min(HISTORY_BATCH_SIZE, limit - fetched)
+        chunk = list(
+            await with_floodwait(
+                lambda: client.get_messages(chat_id, limit=batch, offset_id=offset_id)
+            )
+            or []
+        )
+        if not chunk:
+            break
+        for message in reversed(chunk):
+            await upsert_message(account["id"], chat_id, message)
+        fetched += len(chunk)
+        offset_id = chunk[-1].id
+        if len(chunk) < batch:
+            break
+
+    if fetched:
+        await prune_chat_messages(account["id"], chat_id, keep)
+    return fetched
