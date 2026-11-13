@@ -177,6 +177,21 @@ export interface EditorCapabilities {
   notice: string | null;
 }
 
+export interface AiSummary {
+  summary: string;
+  model: string;
+  sentences: number;
+  source_chars: number;
+}
+
+export interface ChannelIntegrations {
+  discord_webhook_set: boolean;
+  discord_webhook_hint: string | null;
+  vk_token_set: boolean;
+  vk_token_hint: string | null;
+  vk_group_id: string | null;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -330,6 +345,11 @@ export const api = {
     list: () => request<ChannelRecord[]>("/channels"),
     admined: () => request<ChannelRecord[]>("/channels/admined"),
     get: (channelId: number) => request<ChannelDetails>(`/channels/${channelId}`),
+    integrations: {
+      get: (channelId: number) => request<ChannelIntegrations>(`/channels/${channelId}/integrations`),
+      save: (channelId: number, payload: { discord_webhook?: string; vk_token?: string; vk_group_id?: string }) =>
+        request<ChannelIntegrations>(`/channels/${channelId}/integrations`, { method: "PUT", body: json(payload) }),
+    },
     antispam: {
       get: (channelId: number) => request<AntispamSettings>(`/channels/${channelId}/antispam`),
       save: (channelId: number, settings: AntispamSettings) =>
@@ -405,6 +425,10 @@ export const api = {
       form.append("caption", caption);
       return request<MessageRecord>(`/editor/channels/${channelId}/photos`, { method: "POST", body: form });
     },
+  },
+  ai: {
+    summarize: (payload: { text?: string; chat_id?: number; message_id?: number; sentences?: number }) =>
+      request<AiSummary>("/ai/summarize", { method: "POST", body: json(payload) }),
   },
   messages: {
     list: (chatId: number, limit = 50, offsetId = 0) =>

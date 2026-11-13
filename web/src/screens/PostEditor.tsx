@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Bold, Code2, Eye, Italic, Link2, List, Send, Sparkles, Timer, Underline } from "lucide-react";
+import { Bold, Bot, Code2, Eye, Italic, Link2, List, Send, Sparkles, Timer, Underline } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { api, type EditorPreview } from "../lib/api";
+import { api, type AiSummary, type EditorPreview } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
 interface PostEditorProps {
@@ -21,6 +21,9 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
   const [notice, setNotice] = useState<string | null>(null);
   const [premiumNotice, setPremiumNotice] = useState<string | null>(null);
   const [premium, setPremium] = useState(false);
+  const [summary, setSummary] = useState<AiSummary | null>(null);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scheduleRef = useRef<HTMLInputElement>(null);
 
@@ -136,6 +139,19 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
     }
   }
 
+  async function summarize() {
+    if (!text.trim()) return;
+    setSummaryBusy(true);
+    setSummaryError(null);
+    try {
+      setSummary(await api.ai.summarize({ text, sentences: 4 }));
+    } catch (cause) {
+      setSummaryError(cause instanceof Error ? cause.message : t("Не удалось сделать пересказ", "Could not summarize"));
+    } finally {
+      setSummaryBusy(false);
+    }
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void publish(false);
@@ -148,9 +164,20 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
           <h2 className="text-sm font-semibold">{t("Новый пост")}</h2>
           <p className="mt-0.5 text-xs text-muted">{t("Markdown")}</p>
         </div>
-        <button type="button" onClick={showPreview} disabled={!text.trim() || busy} className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-xs font-medium text-muted transition hover:bg-raised hover:text-ink disabled:opacity-50">
-          <Eye size={14} /> {t("Предпросмотр")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void summarize()}
+            disabled={!text.trim() || summaryBusy}
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-accent/10 px-3 text-xs font-medium text-accent transition hover:bg-accent/15 disabled:opacity-50"
+            title={t("Краткий пересказ (AI)", "AI summary")}
+          >
+            <Bot size={14} /> {summaryBusy ? t("Сокращаем…", "Summarizing…") : t("Кратко", "Summary")}
+          </button>
+          <button type="button" onClick={showPreview} disabled={!text.trim() || busy} className="inline-flex h-9 items-center gap-2 rounded-full border border-line px-3 text-xs font-medium text-muted transition hover:bg-raised hover:text-ink disabled:opacity-50">
+            <Eye size={14} /> {t("Предпросмотр")}
+          </button>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2">
         <button type="button" title={t("Жирный")} aria-label={t("Жирный")} onClick={() => wrapSelection("**")} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-raised hover:text-ink"><Bold size={16} /></button>
@@ -178,6 +205,40 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
         {preview?.ok && <div className="post-markdown mx-3 mb-3 rounded-lg border border-line bg-raised p-3 text-sm leading-6"><ReactMarkdown>{text}</ReactMarkdown></div>}
         {preview?.error && <p role="alert" className="mx-3 mb-3 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{t(preview.error)}</p>}
         {preview?.warnings?.map((warning) => <p key={warning} className="mx-4 mb-2 text-xs text-warning">{t(warning)}</p>)}
+        {summary && (
+          <div className="mx-3 mb-3 rounded-[18px] bg-accent/10 p-3 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_18%,transparent)]">
+            <div className="flex items-center gap-2 text-[11px] font-medium text-accent">
+              <Bot size={13} />
+              {t("Краткий пересказ", "AI summary")}
+              <span className="font-mono text-[10px] text-muted">· {summary.model} · {summary.source_chars} {t("симв.", "chars")}</span>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">{summary.summary}</p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setText(summary.summary); setPreview(null); setSummary(null); }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3 text-[11px] font-semibold text-white transition hover:bg-accent-strong"
+              >
+                {t("Заменить текст", "Replace text")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void navigator.clipboard.writeText(summary.summary)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface/60 px-3 text-[11px] font-medium text-ink transition hover:text-accent"
+              >
+                {t("Копировать", "Copy")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSummary(null)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-medium text-muted transition hover:text-ink"
+              >
+                {t("Скрыть", "Hide")}
+              </button>
+            </div>
+          </div>
+        )}
+        {summaryError && <p role="alert" className="mx-3 mb-3 rounded-[18px] bg-danger/10 px-3 py-2 text-sm text-danger">{summaryError}</p>}
         {error && <p role="alert" className="mx-3 mb-3 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         {premiumNotice && <div role="status" className="mx-3 mb-3 flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2.5 text-sm text-ink"><Sparkles size={16} className="mt-0.5 shrink-0 text-accent" /><span>{premiumNotice}</span></div>}
         {notice && <p role="status" className="mx-3 mb-3 rounded-lg border border-line bg-success/10 px-3 py-2 text-sm text-success">{notice}</p>}

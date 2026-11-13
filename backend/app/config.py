@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     bot_internal_secret: str = Field(default="", alias="BOT_INTERNAL_SECRET")
     bot_widget_base_url: str = Field(default="", alias="BOT_WIDGET_BASE_URL")
 
+    # --- AI (суммаризация постов через бесплатную LLM) ---
+    ai_api_key: str = Field(default="", alias="AI_API_KEY")
+    ai_base_url: str = Field(default="https://api.deepseek.com", alias="AI_BASE_URL")
+    ai_model: str = Field(default="deepseek-chat", alias="AI_MODEL")
+    ai_timeout_seconds: float = Field(default=25.0, alias="AI_TIMEOUT_SECONDS")
+
     def bot_allowed_ids(self) -> List[int]:
         """BOT_ALLOWED_USER_IDS=111,222 — белый список Telegram user id."""
         result: List[int] = []

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChartNoAxesColumn, LayoutGrid, MessageSquareText, Radio, Settings2, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, ChartNoAxesColumn, LayoutGrid, MessageSquareText, Plug, Radio, Settings2, ShieldCheck, Users } from "lucide-react";
 import { api, type ChannelDetails, type ChannelRecord } from "../lib/api";
 import { AntispamScreen } from "./AntispamScreen";
 import { ChannelStudio } from "./ChannelStudio";
+import { IntegrationsPanel } from "./IntegrationsPanel";
 import { MessageList } from "./MessageList";
 import { PostEditor } from "./PostEditor";
 import { useI18n } from "../lib/i18n";
 
-type ChannelTab = "posts" | "studio" | "stats" | "antispam" | "settings";
+type ChannelTab = "posts" | "studio" | "stats" | "integrations" | "antispam" | "settings";
 
 interface ChannelDetailProps {
   channel: ChannelRecord;
@@ -21,6 +22,7 @@ const tabs: { id: ChannelTab; label: string; icon: typeof Radio }[] = [
   { id: "posts", label: "Посты", icon: MessageSquareText },
   { id: "studio", label: "Студия", icon: LayoutGrid },
   { id: "stats", label: "Статистика", icon: ChartNoAxesColumn },
+  { id: "integrations", label: "Интеграции", icon: Plug },
   { id: "antispam", label: "Антиспам", icon: ShieldCheck },
   { id: "settings", label: "Настройки", icon: Settings2 },
 ];
@@ -88,6 +90,7 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
           <Stat label={t("Муты / баны")} value={metrics ? `${metrics.mutes} / ${metrics.bans}` : "—"} />
           <Stat label={t("Чат обсуждений")} value={details?.linked_chat_id ? t("Привязан") : t("Не привязан")} />
         </div>}
+        {active === "integrations" && <IntegrationsPanel channelId={channel.id} />}
         {active === "antispam" && <AntispamScreen channelId={channel.id} />}
         {active === "settings" && <dl className="max-w-3xl divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
           <Info label={t("Название")} value={title} />

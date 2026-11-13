@@ -1,3 +1,36 @@
 {% extends "base.html" %}{% block content %}
-<section class="max-w-3xl rounded-xl border border-white/10 bg-zinc-900/50 p-5"><h2 class="font-medium">Экспорт кэшированных сообщений</h2><p class="mt-2 text-sm text-zinc-500">Записей в выборке: <span class="font-mono text-zinc-300">{{ message_count }}</span>. Лимит одного экспорта: {{ max_export }}.</p><div class="mt-5 flex flex-wrap gap-3"><a class="rounded-lg border border-white/10 px-4 py-2 text-sm hover:bg-white/5" href="/admin/export/messages.json">JSON</a><a class="rounded-lg border border-white/10 px-4 py-2 text-sm hover:bg-white/5" href="/admin/export/messages.csv">CSV</a></div></section>
+<section class="admin-card max-w-3xl">
+  <h2 class="text-sm font-medium text-zinc-200">Экспорт кэшированных сообщений</h2>
+  <p class="mt-2 text-sm text-zinc-500">Записей в выборке: <span class="font-mono text-zinc-300">{{ message_count }}</span>. Лимит одного экспорта: {{ max_export }}.</p>
+  <div class="mt-4 flex flex-wrap gap-2">
+    <a class="admin-btn" href="/admin/export/messages.json">JSON</a>
+    <a class="admin-btn" href="/admin/export/messages.csv">CSV</a>
+  </div>
+</section>
+
+<section class="mt-5">
+  <div class="mb-2.5 flex items-end justify-between gap-3">
+    <div>
+      <h2 class="text-sm font-medium text-zinc-200">Экспорт канала в HTML</h2>
+      <p class="mt-0.5 text-[11px] text-zinc-500">Самостоятельный файл: стеклянные карточки, превью медиа, водяной знак «Powered by Aurogram». Печать из браузера даёт PDF.</p>
+    </div>
+    <span class="rounded-full border border-white/[0.08] px-2.5 py-1 font-mono text-[10px] text-zinc-500">{{ channels|length }} каналов</span>
+  </div>
+  <div class="overflow-hidden rounded-2xl border border-white/[0.06]">
+    {% for row in channels %}
+    <div class="flex items-center gap-3 border-b border-white/[0.05] px-3.5 py-3 last:border-b-0 hover:bg-white/[0.02]">
+      <span class="grid size-9 shrink-0 place-items-center rounded-full bg-indigo-500/10 text-[12px] font-semibold text-indigo-200">{{ (row.title or '?')|first|upper }}</span>
+      <span class="min-w-0 flex-1">
+        <span class="block truncate text-sm text-zinc-100">{{ row.title }}</span>
+        <span class="block truncate font-mono text-[11px] text-zinc-500">
+          {% if row.username %}@{{ row.username }} · {% endif %}{{ row.account_name or row.account_id }}
+        </span>
+      </span>
+      <a class="admin-btn shrink-0" href="/admin/export/channel/{{ row.channel_id }}.html?account_id={{ row.account_id|urlencode }}" download>Скачать HTML</a>
+    </div>
+    {% else %}
+    <p class="p-4 text-sm text-zinc-500">В кэше нет каналов — экспортировать пока нечего.</p>
+    {% endfor %}
+  </div>
+</section>
 {% endblock %}

@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.templating import Jinja2Templates
 
 from app.antispam.log import read_log
+from app.admin.exporter import build_channel_html
 from app.cache.manager import connect_cache, touch_cached_media
 from app.cache.index import get_listener_heartbeat
 from app.cache.stats import global_stats, growth_30d
@@ -225,6 +226,94 @@ async def _search_cached(
     return chats, messages, account_hits
 
 
+async def _hourly_activity() -> tuple[list[dict[str, Any]], int]:
+    """Гистограмма активности по часам суток: когда в чатах пишут чаще всего."""
+    accounts = await fetchall("SELECT id FROM accounts")
+    buckets = [0] * 24
+    for account in accounts:
+        try:
+            conn = await connect_cache(account["id"])
+        except Exception:
+            continue
+        try:
+            cursor = await conn.execute(
+                """SELECT CAST(substr(date, 12, 2) AS INTEGER) AS hour, COUNT(*) AS c
+                   FROM cached_messages
+                   WHERE date IS NOT NULL AND length(date) >= 13
+                   GROUP BY hour"""
+            )
+            for row in await cursor.fetchall():
+                hour = int(row["hour"] or 0)
+                if 0 <= hour < 24:
+                    buckets[hour] += int(row["c"] or 0)
+        except Exception:
+            continue
+        finally:
+            await conn.close()
+
+    total = sum(buckets)
+    peak = max(buckets) or 1
+    hourly = [
+        {
+            "hour": hour,
+            "count": buckets[hour],
+            "percent": round(buckets[hour] * 100 / peak),
+            "share": round(buckets[hour] * 100 / total) if total else 0,
+            "label": f"{hour:02d}:00",
+        }
+        for hour in range(24)
+    ]
+    return hourly, total
+
+
+def _recommend_window(hourly: list[dict[str, Any]]) -> dict[str, Any]:
+    """Лучшее двухчасовое окно публикации (по сумме двух соседних часов)."""
+    counts = [row["count"] for row in hourly]
+    if not any(counts):
+        return {"available": False, "hour": None, "label": "—", "share": 0, "count": 0}
+    best = max(range(24), key=lambda hour: counts[hour] + counts[(hour + 1) % 24])
+    window = counts[best] + counts[(best + 1) % 24]
+    total = sum(counts)
+    return {
+        "available": True,
+        "hour": best,
+        "label": f"{best:02d}:00–{(best + 2) % 24:02d}:00",
+        "share": round(window * 100 / total) if total else 0,
+        "count": window,
+    }
+
+
+async def _exportable_channels() -> list[dict[str, Any]]:
+    """Каналы из кэша — для экспорта в HTML."""
+    accounts = await fetchall("SELECT id, name FROM accounts ORDER BY created_at DESC")
+    rows: list[dict[str, Any]] = []
+    for account in accounts:
+        try:
+            conn = await connect_cache(account["id"])
+        except Exception:
+            continue
+        try:
+            cursor = await conn.execute(
+                """SELECT id, title, username FROM cached_chats
+                   WHERE type = 'channel' ORDER BY last_message_date DESC LIMIT 40"""
+            )
+            for chat in await cursor.fetchall():
+                rows.append(
+                    {
+                        "account_id": account["id"],
+                        "account_name": account["name"],
+                        "channel_id": chat["id"],
+                        "title": chat["title"] or str(chat["id"]),
+                        "username": chat["username"],
+                    }
+                )
+        except Exception:
+            continue
+        finally:
+            await conn.close()
+    return rows
+
+
 def _csv_response(rows: list[dict[str, Any]], fields: list[str], filename: str) -> Response:
     output = io.StringIO(newline="")
     writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
@@ -333,9 +422,20 @@ async def _page_data(page: str) -> dict[str, Any]:
         files.sort(key=lambda item: item["modified"], reverse=True)
         return {"rows": files[:200]}
     if page == "stats":
-        return {"stats": await global_stats(), "growth": await growth_30d()}
+        hourly, total = await _hourly_activity()
+        return {
+            "stats": await global_stats(),
+            "growth": await growth_30d(),
+            "hourly": hourly,
+            "hourly_total": total,
+            "recommended": _recommend_window(hourly),
+        }
     if page == "export":
-        return {"message_count": len(await _cached_messages(10_000)), "max_export": 10_000}
+        return {
+            "message_count": len(await _cached_messages(10_000)),
+            "max_export": 10_000,
+            "channels": await _exportable_channels(),
+        }
     if page == "logs":
         channels = await fetchall(
             "SELECT account_id, channel_id FROM channel_settings ORDER BY updated_at DESC LIMIT 50"
@@ -757,6 +857,23 @@ async def admin_search(request: Request, q: str = Query(default="", max_length=1
     )
 
 
+@router.get("/stats/recommend", response_class=HTMLResponse)
+async def stats_recommend(request: Request) -> Response:
+    """Фрагмент «Рекомендовать время» для страницы статистики."""
+    if not _admin_session(request):
+        return HTMLResponse("", status_code=401)
+    hourly, total = await _hourly_activity()
+    return templates.TemplateResponse(
+        request=request,
+        name="stats_recommend.html",
+        context={
+            "request": request,
+            "recommended": _recommend_window(hourly),
+            "hourly_total": total,
+        },
+    )
+
+
 @router.get("/accounts", response_class=HTMLResponse)
 async def admin_accounts(request: Request, state: str = "all") -> Response:
     if not _admin_session(request):
@@ -838,6 +955,25 @@ async def export_accounts_csv(request: Request, state: str = "all") -> Response:
         rows,
         ["id", "phone", "name", "username", "auth_state", "created_at", "last_sync"],
         "aurogram-accounts.csv",
+    )
+
+
+@router.get("/export/channel/{channel_id}.html")
+async def export_channel_html(
+    request: Request,
+    channel_id: int,
+    account_id: str = Query(default="", max_length=64),
+) -> Response:
+    """Красивый самостоятельный HTML-файл с историей постов канала."""
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    if not account_id:
+        return HTMLResponse("Не указан аккаунт", status_code=422)
+    content = await build_channel_html(account_id, channel_id)
+    return Response(
+        content=content,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="aurogram-channel-{channel_id}.html"'},
     )
 
 

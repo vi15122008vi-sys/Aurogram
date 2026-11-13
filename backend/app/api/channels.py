@@ -5,16 +5,17 @@ import io
 import json
 import re
 import secrets
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, Field
 
 from app.antispam.checker import check_message
 from app.antispam.log import metrics_24h, read_log
 from app.antispam.settings import dump_settings, load_channel_settings
 from app.antispam.stopwords import add_history, ensure_seeded, list_words, load_builtin
 from app.database import execute, fetchall, fetchone
-from app.deps import get_current_account
+from app.deps import decrypt_secret, encrypt_secret, get_current_account
 from app.models import (
     AntiSpamSettings,
     AntispamTestRequest,
@@ -63,6 +64,95 @@ async def channel(
     account: dict[str, Any] = Depends(get_current_account),
 ) -> dict[str, Any]:
     return await get_channel_full(account, channel_id)
+
+
+class IntegrationUpdate(BaseModel):
+    """Секреты приходят в открытом виде и шифруются перед записью."""
+
+    discord_webhook: Optional[str] = Field(default=None, max_length=512)
+    vk_token: Optional[str] = Field(default=None, max_length=512)
+    vk_group_id: Optional[str] = Field(default=None, max_length=32)
+
+
+def _reveal(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    try:
+        return decrypt_secret(value)
+    except HTTPException:
+        return None
+
+
+def _masked(value: Optional[str]) -> Optional[str]:
+    revealed = _reveal(value)
+    return f"…{revealed[-4:]}" if revealed else None
+
+
+async def _integration_row(account_id: str, channel_id: int) -> Optional[dict[str, Any]]:
+    row = await fetchone(
+        "SELECT * FROM channel_integrations WHERE account_id = ? AND channel_id = ?",
+        (account_id, channel_id),
+    )
+    return dict(row) if row else None
+
+
+@router.get("/{channel_id}/integrations")
+async def get_integrations(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    row = await _integration_row(account["id"], channel_id)
+    if not row:
+        return {
+            "discord_webhook_set": False,
+            "discord_webhook_hint": None,
+            "vk_token_set": False,
+            "vk_token_hint": None,
+            "vk_group_id": None,
+        }
+    return {
+        "discord_webhook_set": bool(row.get("discord_webhook_enc")),
+        "discord_webhook_hint": _masked(row.get("discord_webhook_enc")),
+        "vk_token_set": bool(row.get("vk_token_enc")),
+        "vk_token_hint": _masked(row.get("vk_token_enc")),
+        "vk_group_id": row.get("vk_group_id"),
+    }
+
+
+@router.put("/{channel_id}/integrations")
+async def save_integrations(
+    channel_id: int,
+    payload: IntegrationUpdate,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    row = await _integration_row(account["id"], channel_id) or {}
+    webhook = row.get("discord_webhook_enc")
+    vk_token = row.get("vk_token_enc")
+    vk_group = row.get("vk_group_id")
+
+    # Пустая строка — осознанная очистка, None — «не трогать».
+    if payload.discord_webhook is not None:
+        value = payload.discord_webhook.strip()
+        webhook = encrypt_secret(value) if value else None
+    if payload.vk_token is not None:
+        value = payload.vk_token.strip()
+        vk_token = encrypt_secret(value) if value else None
+    if payload.vk_group_id is not None:
+        group = payload.vk_group_id.strip().lstrip("-")
+        vk_group = group or None
+
+    await execute(
+        """INSERT INTO channel_integrations
+               (account_id, channel_id, discord_webhook_enc, vk_token_enc, vk_group_id, updated_at)
+           VALUES (?, ?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(account_id, channel_id) DO UPDATE SET
+               discord_webhook_enc = excluded.discord_webhook_enc,
+               vk_token_enc = excluded.vk_token_enc,
+               vk_group_id = excluded.vk_group_id,
+               updated_at = excluded.updated_at""",
+        (account["id"], channel_id, webhook, vk_token, vk_group),
+    )
+    return await get_integrations(channel_id, account)
 
 
 @router.get("/{channel_id}/antispam", response_model=AntiSpamSettings)

@@ -73,3 +73,5 @@ SEND_CODE_LIMITER = SlidingWindowLimiter(limit=5, window=60.0)
 RECOVER_LIMITER = SlidingWindowLimiter(limit=3, window=300.0)
 QR_LIMITER = SlidingWindowLimiter(limit=10, window=60.0)
 ADMIN_LOGIN_LIMITER = SlidingWindowLimiter(limit=5, window=300.0)
+# AI тратит внешние токены — держим недорогой лимит на пользователя.
+AI_LIMITER = SlidingWindowLimiter(limit=10, window=60.0)

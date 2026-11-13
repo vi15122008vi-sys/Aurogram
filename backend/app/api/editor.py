@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,6 +11,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from app.deps import get_current_account
 from app.editor.capabilities import capabilities
 from app.editor.rich_editor import preview
+from app.integrations.crosspost import deliver
 from app.models import EditorPreviewRequest, MessageOut, PostCreate
 from app.telegram.client import get_client
 from app.telegram.floodwait import with_floodwait
@@ -59,6 +61,13 @@ async def publish_post(
             silent=payload.silent,
         )
     )
+    # Кросс-постинг только для немедленных публикаций: отложенные отправит
+    # Telegram, и копировать их сразу было бы неверно.
+    if not payload.schedule_at:
+        try:
+            await deliver(account["id"], channel_id, payload.text)
+        except Exception as exc:  # интеграции не должны ломать публикацию
+            log.warning("crosspost failed for channel %s: %s", channel_id, exc)
     return to_out(message, channel_id)
 
 

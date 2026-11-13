@@ -132,6 +132,16 @@ CREATE INDEX IF NOT EXISTS idx_stopwords_channel
     ON antispam_stopwords(account_id, channel_id, category);
 CREATE INDEX IF NOT EXISTS idx_word_history_channel
     ON antispam_word_history(account_id, channel_id, created_at);
+
+CREATE TABLE IF NOT EXISTS channel_integrations (
+    account_id TEXT NOT NULL,
+    channel_id INTEGER NOT NULL,
+    discord_webhook_enc TEXT,
+    vk_token_enc TEXT,
+    vk_group_id TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (account_id, channel_id)
+);
 """
 
 
