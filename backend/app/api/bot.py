@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 
 from app.bot.client import BotError, call, create_sticker_set, get_me, get_updates, send_message, set_webhook, webhook_info
+from app.botapi.commands import answer_callback, ensure_commands, reply, send_menu
 from app.bot.guard import allowed_user_ids, internal_secret, is_allowed_user, is_internal_request
 from app.config import get_settings
 from app.deps import get_current_account
@@ -95,22 +96,58 @@ async def bot_webhook(
     except ValueError:
         return {"ok": True, "ignored": "payload"}
 
+    # 0. Команды бота: регистрируем меню и отвечаем на /start и друзей.
+    message = update.get("message") or {}
+    text = str(message.get("text") or "").strip().lower()
+    chat = message.get("chat") or {}
+    if text and chat.get("id"):
+        await ensure_commands()
+        if text.startswith("/start"):
+            await send_menu(chat["id"])
+            return {"ok": True, "command": "start"}
+        if text.startswith("/help"):
+            await reply(
+                chat["id"],
+                "<b>Что умеет Aurogram</b>\n"
+                "/widgets — мои виджеты\n"
+                "/create_widget — генерация виджета с AI\n"
+                "/settings — настройки\n"
+                "А ещё пришли фото — сделаю стикер 🎨",
+            )
+            return {"ok": True, "command": "help"}
+        if text.startswith("/widgets"):
+            await reply(chat["id"], "Виджеты открываются в Студии канала → «Виджеты».")
+            return {"ok": True, "command": "widgets"}
+        if text.startswith("/create_widget"):
+            await reply(chat["id"], "Опиши виджет словами — например «опрос про фильмы».")
+            return {"ok": True, "command": "create_widget"}
+        if text.startswith("/settings"):
+            await reply(chat["id"], "Настройки — в приложении: Профиль → Настройки.")
+            return {"ok": True, "command": "settings"}
+
     # 0. Callback-кнопки из постов: подтверждаем нажатие, чтобы у клиента не крутился спиннер.
     callback = update.get("callback_query")
     if isinstance(callback, dict) and callback.get("id"):
-        try:
-            await call(
-                "answerCallbackQuery",
-                data={
-                    "callback_query_id": callback["id"],
-                    "text": "Готово",
-                },
-            )
-        except BotError as exc:
-            log.warning("callback answer failed: %s", exc)
+        await answer_callback(callback["id"], "Готово")
 
         data = str(callback.get("data") or "")
         chat = (callback.get("message") or {}).get("chat") or {}
+
+        if data.startswith("menu:"):
+            action = data.split(":", 1)[1]
+            if chat.get("id"):
+                if action == "create_widget":
+                    await reply(chat["id"], "Опиши виджет словами: «опрос про фильмы», «таймер на 5 минут».")
+                elif action == "widgets":
+                    await reply(chat["id"], "Все сгенерированные виджеты — в Студии канала → «Виджеты».")
+                elif action == "settings":
+                    await reply(chat["id"], "Настройки: /settings или вкладка «Профиль» → «Настройки».")
+                else:
+                    await reply(
+                        chat["id"],
+                        "<b>Команды</b>\n/start — меню\n/widgets — виджеты\n/create_widget — генерация\n/settings — настройки",
+                    )
+            return {"ok": True, "menu": action}
         if data.startswith("widget:") and chat.get("id"):
             from app.config import get_settings
             from app.database import fetchone

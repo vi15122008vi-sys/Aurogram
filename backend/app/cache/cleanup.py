@@ -283,10 +283,45 @@ async def run_cleanup() -> dict:
                 max_bytes / (1024**3),
             )
 
+    widgets_removed, widgets_expired = await purge_stale_widgets()
+    if widgets_removed:
+        log.info("cleanup: removed %s widgets (%s expired)", widgets_removed, widgets_expired)
+
     log.info(
         "cleanup: freed %.1f GB, %s messages, %s media",
         freed / (1024**3),
         msg_removed,
         media_removed,
     )
-    return {"freed": freed, "messages": msg_removed, "media": media_removed}
+    return {
+        "freed": freed,
+        "messages": msg_removed,
+        "media": media_removed,
+        "widgets": widgets_removed,
+        "widgets_expired": widgets_expired,
+    }
+
+
+async def purge_stale_widgets(*, days: int = 30, keep_per_account: int = 100) -> tuple[int, int]:
+    """Удаляет виджеты старше N дней и лишние сверх лимита на аккаунт."""
+    from app.database import execute, fetchall
+
+    expired = await fetchall(
+        "SELECT slug FROM widgets WHERE created_at < datetime('now', ?)",
+        (f"-{days} days",),
+    )
+    extra_rows = await fetchall(
+        """
+        SELECT slug FROM (
+            SELECT slug, account_id,
+                   ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY created_at DESC) AS rn
+            FROM widgets
+        ) WHERE rn > ?
+        """,
+        (keep_per_account,),
+    )
+    removed = 0
+    for row in [*expired, *extra_rows]:
+        await execute("DELETE FROM widgets WHERE slug = ?", (row["slug"],))
+        removed += 1
+    return removed, len(expired)

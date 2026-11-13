@@ -216,10 +216,28 @@ async def get_stored_widget_public(slug: str) -> HTMLResponse:
     return _widget_response(await _stored_html(slug))
 
 
+TELEGRAM_SDK = (
+    '<script src="https://telegram.org/js/telegram-web-app.js"></script>'
+    "<script>window.addEventListener('load',function(){"
+    "try{if(window.Telegram&&Telegram.WebApp){Telegram.WebApp.ready();"
+    "Telegram.WebApp.expand();}}catch(e){}});</script>"
+)
+
+
+def _with_webapp(html: str) -> str:
+    """Подключает Telegram WebApp SDK и готовит страницу к открытию в клиенте."""
+    if "telegram-web-app.js" in html:
+        return html
+    if "</head>" in html:
+        return html.replace("</head>", f"{TELEGRAM_SDK}</head>", 1)
+    return f"<!doctype html><html lang=\"ru\"><head><meta charset=\"utf-8\">{TELEGRAM_SDK}</head><body>{html}</body></html>"
+
+
 def _widget_response(html: str) -> HTMLResponse:
     return HTMLResponse(
-        content=html,
+        content=_with_webapp(html),
         headers={
+            "Content-Security-Policy": "script-src 'unsafe-inline' 'self' https://telegram.org; object-src 'none';",
             "Cache-Control": "public, max-age=3600",
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": "no-referrer",
