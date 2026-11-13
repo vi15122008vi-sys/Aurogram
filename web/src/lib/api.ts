@@ -262,10 +262,13 @@ export interface ChannelIntegrations {
 export class ApiError extends Error {
   readonly status: number;
 
-  constructor(message: string, status: number) {
+  retryAfter?: number;
+
+  constructor(message: string, status: number, retryAfter?: number) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -379,7 +382,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     // Просроченный или отозванный токен не должен залипать в localStorage.
     if (response.status === 401) setBearerToken(null);
-    throw new ApiError(translateApiMessage(readableApiError(body?.detail, response.status)), response.status);
+    throw new ApiError(
+      translateApiMessage(readableApiError(body?.detail, response.status)),
+      response.status,
+      Number(response.headers.get("Retry-After") || 0) || undefined,
+    );
   }
 
   // Сервер отдаёт токен в теле — запоминаем его для Authorization: Bearer.
@@ -414,7 +421,11 @@ async function download(path: string): Promise<Blob> {
   }
   if (!response.ok) {
     const body = await response.json().catch(() => undefined);
-    throw new ApiError(translateApiMessage(readableApiError(body?.detail, response.status)), response.status);
+    throw new ApiError(
+      translateApiMessage(readableApiError(body?.detail, response.status)),
+      response.status,
+      Number(response.headers.get("Retry-After") || 0) || undefined,
+    );
   }
   try {
     return await response.blob();

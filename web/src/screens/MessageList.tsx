@@ -63,6 +63,21 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   const [lastSentId, setLastSentId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authExpired, setAuthExpired] = useState(false);
+  const [retryLeft, setRetryLeft] = useState(0);
+
+  useEffect(() => {
+    if (retryLeft <= 0) return;
+    const timer = window.setInterval(() => {
+      setRetryLeft((value) => (value <= 1 ? 0 : value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [retryLeft > 0]);
+
+  function formatRetry(total: number): string {
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
   const [offline, setOffline] = useState(false);
   const [reactionTarget, setReactionTarget] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
@@ -96,6 +111,10 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
       })
       .catch((cause: unknown) => {
         if (cause instanceof ApiError && cause.status === 401) setAuthExpired(true);
+          if (cause instanceof ApiError && cause.status === 429) {
+            const seconds = cause.retryAfter ?? Number((cause.message.match(/(\d+)/) ?? [])[1] ?? 60);
+            setRetryLeft(seconds);
+          }
         if (!active) return;
         // Нет сети — поднимаем последнюю копию переписки из localStorage.
         if (isOfflineError(cause)) {
@@ -272,6 +291,11 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
           </div>
         ))}
       </div>
+      {retryLeft > 0 && (
+        <div role="status" className="mx-3 mb-3 rounded-[16px] bg-warning/10 px-3 py-2 text-xs text-warning">
+          {t("Подождите")} {formatRetry(retryLeft)} — {t("Telegram ограничил загрузку")}
+        </div>
+      )}
       {authExpired && (
         <div role="alert" className="mx-3 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[16px] bg-danger/10 px-3 py-2 text-xs text-danger">
           <span>{t("Сессия истекла, войдите заново")}</span>
