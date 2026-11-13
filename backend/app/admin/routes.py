@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Body, Depends, Form, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -21,6 +21,7 @@ from app.cache.stats import global_stats, growth_30d
 from app.config import get_settings
 from app.database import fetchall
 from app.ratelimit import ADMIN_LOGIN_LIMITER, limit_requests
+from app.invites import create_code as invite_create, delete_code as invite_delete, list_codes as invite_list, master_code as invite_master, set_active as invite_set_active
 from app.telegram.chats import fetch_chat_history
 from app.telegram.media import download_message_media, resolve_media_file
 
@@ -30,6 +31,7 @@ templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 PAGES = {
     "accounts": "Аккаунты",
+    "invites": "Приглашения",
     "channels": "Каналы",
     "bots": "Боты",
     "chats": "Чаты",
@@ -50,6 +52,7 @@ PAGES = {
 ICONS = {
     "dashboard": '<path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/>',
     "accounts": '<path d="M16 19v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V19"/><circle cx="9.5" cy="7.5" r="3"/>',
+    "invites": '<path d="M4 9a3 3 0 0 1 0 6v3h16v-3a3 3 0 0 1 0-6V6H4z"/><path d="M9 12h6"/>',
     "channels": '<circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4"/>',
     "bots": '<rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 8V5"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/>',
     "chats": '<path d="M4 6h16v10H8l-4 4z"/>',
@@ -379,6 +382,8 @@ async def _page_data(page: str) -> dict[str, Any]:
                ORDER BY cs.updated_at DESC LIMIT 300"""
         )
         return {"rows": [dict(row) for row in rows]}
+    if page == "invites":
+        return {"codes": await invite_list(), "master_code": invite_master()}
     if page == "bots":
         rows = await fetchall("SELECT id, account_id, username, name, webhook_url, created_at FROM bots ORDER BY created_at DESC")
         return {"rows": [dict(row) for row in rows]}
@@ -993,6 +998,58 @@ async def export_channel_html(
         media_type="text/html; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="aurogram-channel-{channel_id}.html"'},
     )
+
+
+@router.post("/invites")
+async def admin_invite_create(request: Request, code: str = Form(default="")) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    await invite_create(code or None)
+    return RedirectResponse("/admin/invites", status_code=303)
+
+
+@router.patch("/invites/{code_id}")
+async def admin_invite_patch(
+    request: Request,
+    code_id: int,
+    body: dict[str, Any] | None = Body(default=None),
+) -> JSONResponse:
+    if not _admin_session(request):
+        return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    rows = await invite_list()
+    current = next((row for row in rows if int(row["id"]) == code_id), None)
+    if not current:
+        return JSONResponse({"detail": "not found"}, status_code=404)
+    active = bool(body.get("is_active")) if body and "is_active" in body else not bool(current["is_active"])
+    updated = await invite_set_active(code_id, active)
+    return JSONResponse({"status": "ok", "code": updated})
+
+
+@router.delete("/invites/{code_id}")
+async def admin_invite_delete_request(request: Request, code_id: int) -> JSONResponse:
+    if not _admin_session(request):
+        return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    removed = await invite_delete(code_id)
+    return JSONResponse({"status": "deleted" if removed else "missing"}, status_code=200 if removed else 404)
+
+
+@router.post("/invites/{code_id}/toggle")
+async def admin_invite_toggle(request: Request, code_id: int) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    rows = await invite_list()
+    current = next((row for row in rows if int(row["id"]) == code_id), None)
+    if current:
+        await invite_set_active(code_id, not bool(current["is_active"]))
+    return RedirectResponse("/admin/invites", status_code=303)
+
+
+@router.post("/invites/{code_id}/delete")
+async def admin_invite_delete_form(request: Request, code_id: int) -> Response:
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    await invite_delete(code_id)
+    return RedirectResponse("/admin/invites", status_code=303)
 
 
 @router.get("/{page}", response_class=HTMLResponse)

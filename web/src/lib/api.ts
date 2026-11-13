@@ -386,10 +386,10 @@ const json = (value: unknown): string => JSON.stringify(value);
 export const api = {
   auth: {
     me: () => request<AuthAccount>("/auth/me"),
-    sendCode: (phone: string) =>
+    sendCode: (phone: string, inviteCode?: string) =>
       request<SendCodeResult>("/auth/send_code", {
         method: "POST",
-        body: json({ phone }),
+        body: json({ phone, invite_code: inviteCode?.trim() || null }),
       }),
     signIn: (payload: {
       phone: string;

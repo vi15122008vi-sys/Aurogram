@@ -46,6 +46,7 @@ class RegisterKeyRequest(BaseModel):
 
 class SendCodeRequest(BaseModel):
     phone: str
+    invite_code: Optional[str] = Field(default=None, max_length=64)
     force_method: Optional[ForceMethod] = None
     api_id: Optional[int] = None
     api_hash: Optional[str] = None

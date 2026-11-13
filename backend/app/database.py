@@ -12,6 +12,15 @@ from app.config import get_settings
 log = logging.getLogger("aurogram.database")
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS invite_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    used_by TEXT,
+    last_used_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
     phone TEXT NOT NULL,
@@ -199,6 +208,11 @@ async def init_db() -> None:
         await conn.commit()
     finally:
         await conn.close()
+
+    # Мастер-код из .env должен быть виден в админке (используем отдельное соединение).
+    from app.invites import ensure_master_row
+
+    await ensure_master_row()
 
 
 async def find_account_by_phone(phone: str) -> Optional[dict[str, Any]]:

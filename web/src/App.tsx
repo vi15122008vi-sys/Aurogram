@@ -58,15 +58,19 @@ export default function App() {
     };
   }, []);
 
-  async function sendCode(phone: string) {
+  async function sendCode(phone: string, inviteCode: string) {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.auth.sendCode(phone);
+      const result = await api.auth.sendCode(phone, inviteCode);
       setPending(result);
       setAuthScreen("code");
     } catch (cause) {
-      setError(cause instanceof Error ? t(cause.message) : t("Не удалось отправить код"));
+      if (cause instanceof ApiError && cause.status === 403) {
+        setError(t("Неверный код приглашения. Обратитесь к администратору"));
+      } else {
+        setError(cause instanceof Error ? t(cause.message) : t("Не удалось отправить код"));
+      }
     } finally {
       setBusy(false);
     }

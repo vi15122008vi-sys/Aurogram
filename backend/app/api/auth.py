@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.deps import get_current_account, get_optional_account
+from app.invites import is_valid as invite_is_valid, mark_used as mark_invite_used
 from app.models import (
     RecoverPasswordRequest,
     RegisterKeyRequest,
@@ -87,6 +88,13 @@ async def send_code(
     response: Response,
     account: dict[str, Any] | None = Depends(get_optional_account),
 ) -> dict[str, Any]:
+    invite_code = payload.invite_code
+    if not await invite_is_valid(invite_code):
+        raise HTTPException(
+            status_code=403,
+            detail="Неверный или отозванный код приглашения",
+        )
+
     result = await telegram_auth.send_code(
         phone=_normalize_phone(payload.phone),
         force_method=payload.force_method,
@@ -96,6 +104,7 @@ async def send_code(
         device_id=request.headers.get("x-device-id", "default"),
     )
     _set_auth_cookie(response, request, result.get("token"))
+    await mark_invite_used(invite_code, _normalize_phone(payload.phone))
     return _auth_payload(result)
 
 

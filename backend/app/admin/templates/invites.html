@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% block content %}
+<section class="mx-auto max-w-5xl">
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p class="admin-mono text-[10px] uppercase tracking-[0.16em] text-indigo-300/70">ACCESS / INVITES</p>
+      <h1 class="mt-1 text-2xl font-semibold tracking-tight text-zinc-100">Приглашения</h1>
+      <p class="mt-1 text-xs text-zinc-500">Без активного кода вход в приложение закрыт. Мастер-код из <code class="font-mono text-indigo-300">INVITE_CODE</code> работает всегда.</p>
+    </div>
+    {% if master_code %}
+    <span class="rounded-full border border-indigo-300/20 bg-indigo-500/10 px-3 py-1.5 font-mono text-[11px] text-indigo-200">master: {{ master_code }}</span>
+    {% endif %}
+  </div>
+
+  <form method="post" action="/admin/invites" class="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-xl">
+    <label class="grid gap-1.5 text-xs text-zinc-400">
+      <span>Новый код</span>
+      <input name="code" maxlength="64" placeholder="оставьте пустым — сгенерируем" class="h-9 w-72 rounded-lg border border-white/10 bg-zinc-950/70 px-3 font-mono text-sm text-zinc-100 outline-none focus:border-indigo-400">
+    </label>
+    <button type="submit" class="h-9 rounded-lg border border-indigo-300/20 bg-indigo-500/15 px-3 text-xs font-semibold text-indigo-100 transition hover:bg-indigo-500/25">Создать код</button>
+    <span class="text-[11px] text-zinc-500">Код приводится к верхнему регистру, пробелы удаляются.</span>
+  </form>
+
+  {% if codes %}
+  <div class="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-white/[0.03] text-[11px] uppercase tracking-wide text-zinc-500">
+        <tr>
+          <th class="px-3 py-2.5">Код</th>
+          <th class="px-3 py-2.5">Статус</th>
+          <th class="px-3 py-2.5">Использовал</th>
+          <th class="px-3 py-2.5">Последнее использование</th>
+          <th class="px-3 py-2.5">Создан</th>
+          <th class="px-3 py-2.5 text-right">Действия</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for code in codes %}
+        <tr class="align-middle">
+          <td class="px-3 py-2.5 font-mono text-xs text-zinc-100">{{ code.code }}{% if master_code and code.code == master_code %} <span class="ml-1 rounded bg-indigo-500/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-indigo-200">master</span>{% endif %}</td>
+          <td class="px-3 py-2.5">
+            {% if code.is_active %}
+            <span class="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300">активен</span>
+            {% else %}
+            <span class="rounded-full bg-rose-400/10 px-2 py-0.5 text-[11px] font-medium text-rose-300">отозван</span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-2.5 font-mono text-xs text-zinc-300">{{ code.used_by or "—" }}</td>
+          <td class="px-3 py-2.5 font-mono text-xs text-zinc-400">{{ code.last_used_at or "—" }}</td>
+          <td class="px-3 py-2.5 font-mono text-xs text-zinc-500">{{ code.created_at }}</td>
+          <td class="px-3 py-2.5">
+            <div class="flex justify-end gap-1.5">
+              <form method="post" action="/admin/invites/{{ code.id }}/toggle">
+                <button type="submit" class="h-7 rounded-md border border-white/10 px-2 text-[11px] text-zinc-300 transition hover:bg-white/5">
+                  {% if code.is_active %}Отозвать{% else %}Активировать{% endif %}
+                </button>
+              </form>
+              <form method="post" action="/admin/invites/{{ code.id }}/delete" onsubmit="return confirm('Удалить код {{ code.code }}?');">
+                <button type="submit" class="h-7 rounded-md border border-rose-400/20 bg-rose-500/10 px-2 text-[11px] text-rose-200 transition hover:bg-rose-500/20">Удалить</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">
+    Кодов пока нет. Создайте первый — без него войти в приложение нельзя (если не задан INVITE_CODE).
+  </p>
+  {% endif %}
+</section>
+{% endblock %}

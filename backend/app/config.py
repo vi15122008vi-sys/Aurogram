@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     cache_evict_messages: bool = Field(default=False, alias="CACHE_EVICT_MESSAGES")
     # Сколько последних сообщений хранить на каждый чат (защита диска).
     cache_max_messages_per_chat: int = Field(default=1000, alias="CACHE_MAX_MESSAGES_PER_CHAT")
+    # Мастер-код приглашения: работает всегда, даже если база пуста.
+    invite_code: str = Field(default="", alias="INVITE_CODE")
 
     admin_user: str = Field(default="admin", alias="ADMIN_USER")
     admin_password: str = Field(default="change-me", alias="ADMIN_PASSWORD")

@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, KeyRound, Phone } from "lucide-react";
+import { ArrowRight, KeyRound, Phone, Ticket } from "lucide-react";
 import { AuthShell } from "../components/AuthShell";
 import { useI18n } from "../lib/i18n";
 
 interface PhoneInputProps {
   busy: boolean;
   error: string | null;
-  onSubmit: (phone: string) => Promise<void>;
+  onSubmit: (phone: string, inviteCode: string) => Promise<void>;
   onApiKey: () => void;
 }
 
@@ -23,12 +23,13 @@ export function PhoneInput({ busy, error, onSubmit, onApiKey }: PhoneInputProps)
   const { t } = useI18n();
   const [prefix, setPrefix] = useState("+7");
   const [number, setNumber] = useState("");
+  const [invite, setInvite] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalized = `${prefix}${number.replace(/\D/g, "")}`;
     if (normalized.length < 8) return;
-    await onSubmit(normalized);
+    await onSubmit(normalized, invite.trim());
   }
 
   return (
@@ -38,6 +39,23 @@ export function PhoneInput({ busy, error, onSubmit, onApiKey }: PhoneInputProps)
       description={t("Укажите номер телефона, чтобы получить код подтверждения.")}
     >
       <form className="space-y-5" onSubmit={submit}>
+        <label className="block text-sm font-medium" htmlFor="invite-code">
+          {t("Код приглашения")}
+          <span className="mt-2 flex h-12 items-center gap-2 overflow-hidden rounded-lg border border-line bg-surface transition focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent/50">
+            <input
+              id="invite-code"
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              value={invite}
+              onChange={(event) => setInvite(event.target.value.toUpperCase())}
+              maxLength={64}
+              placeholder="AUROXXXXXXXX"
+              className="min-w-0 flex-1 bg-transparent px-3 font-mono text-sm uppercase outline-none placeholder:normal-case placeholder:text-muted"
+              required
+            />
+            <span className="grid w-10 place-items-center text-muted"><Ticket size={16} /></span>
+          </span>
+        </label>
         <label className="block text-sm font-medium" htmlFor="phone-number">
           {t("Номер телефона")}
           <span className="mt-2 flex h-12 overflow-hidden rounded-lg border border-line bg-surface transition focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent/50">
