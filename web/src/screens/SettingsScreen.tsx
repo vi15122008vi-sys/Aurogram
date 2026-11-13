@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Bell, Database, Gauge, Languages, LogOut, Palette, ShieldCheck, Sparkles, UserRound, Zap,
+  Bell, Database, Gauge, Languages, Loader2, LogOut, Palette, ShieldCheck, Sparkles, UserRound, Zap,
 } from "lucide-react";
 import { api, type AiReplyStyle, type CardStyle, type Density, type PrivacyPreferences, type UiSettings } from "../lib/api";
 import { GlassButton } from "../components/Buttons";
@@ -104,11 +104,66 @@ export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) 
   const [privacyError, setPrivacyError] = useState<string | null>(null);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [quietHours, setQuietHours] = useState(false);
-  const [cacheLimit, setCacheLimit] = useState(20);
-  const [cacheReset, setCacheReset] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [vibration, setVibration] = useState(true);
+  const [previews, setPreviews] = useState(true);
+  const [quietFrom, setQuietFrom] = useState("23:00");
+  const [quietTo, setQuietTo] = useState("08:00");
+  const [autoDownload, setAutoDownload] = useState<"wifi" | "always">("wifi");
+  const [cacheGb, setCacheGb] = useState(20);
+  const [cacheBusy, setCacheBusy] = useState(false);
+  const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeId>("aurogram");
   const [ui, setUi] = useState<UiSettings>(() => readLocalUi());
   const [uiBusy, setUiBusy] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("aurogram.prefs");
+      if (raw) {
+        const saved = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof saved.sound === "boolean") setSoundEnabled(saved.sound);
+        if (typeof saved.vibration === "boolean") setVibration(saved.vibration);
+        if (typeof saved.previews === "boolean") setPreviews(saved.previews);
+        if (typeof saved.quietFrom === "string") setQuietFrom(saved.quietFrom);
+        if (typeof saved.quietTo === "string") setQuietTo(saved.quietTo);
+        if (saved.autoDownload === "always" || saved.autoDownload === "wifi") setAutoDownload(saved.autoDownload);
+        if (typeof saved.cacheGb === "number") setCacheGb(saved.cacheGb);
+      }
+    } catch {
+      /* повреждённые prefs — игнорируем */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("aurogram.prefs", JSON.stringify({
+        sound: soundEnabled, vibration, previews, quietFrom, quietTo, autoDownload, cacheGb,
+      }));
+    } catch {
+      /* приватный режим */
+    }
+  }, [soundEnabled, vibration, previews, quietFrom, quietTo, autoDownload, cacheGb]);
+
+  async function clearCache() {
+    if (!window.confirm(t("Очистить кэш приложения? Медиа и сообщения будут загружены заново.", "Clear the app cache? Media and messages will be re-downloaded."))) return;
+    setCacheBusy(true);
+    setCacheNotice(null);
+    try {
+      let removed = 0;
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith("aurogram.cache.") || key.startsWith("aurogram.chats.")) {
+          localStorage.removeItem(key);
+          removed += 1;
+        }
+      }
+      setCacheNotice(`${t("Кэш очищен", "Cache cleared")} (${removed})`);
+    } catch (cause) {
+      setCacheNotice(cause instanceof Error ? cause.message : t("Не удалось очистить кэш"));
+    } finally {
+      setCacheBusy(false);
+    }
+  }
 
   useEffect(() => {
     const stored = localStorage.getItem("aurogram.theme") as ThemeId | null;
@@ -310,6 +365,25 @@ export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) 
               <span className="text-xs text-ink">{t("Тихий режим")}</span>
               <Toggle checked={quietHours} onChange={setQuietHours} label={t("Тихий режим")} />
             </div>
+            {quietHours && (
+              <div className="flex items-center gap-2">
+                <input type="time" value={quietFrom} onChange={(event) => setQuietFrom(event.target.value)} className="h-8 flex-1 rounded-[10px] bg-surface/60 px-2 font-mono text-[11px] text-ink outline-none" aria-label={t("С")} />
+                <span className="text-[10px] text-muted">—</span>
+                <input type="time" value={quietTo} onChange={(event) => setQuietTo(event.target.value)} className="h-8 flex-1 rounded-[10px] bg-surface/60 px-2 font-mono text-[11px] text-ink outline-none" aria-label={t("До")} />
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-ink">{t("Звук")}</span>
+              <Toggle checked={soundEnabled} onChange={setSoundEnabled} label={t("Звук")} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-ink">{t("Вибрация")}</span>
+              <Toggle checked={vibration} onChange={setVibration} label={t("Вибрация")} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-ink">{t("Превью сообщений")}</span>
+              <Toggle checked={previews} onChange={setPreviews} label={t("Превью сообщений")} />
+            </div>
           </div>
         </BentoCard>
 
@@ -327,14 +401,28 @@ export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) 
           description={t("Сколько медиа хранить локально.", "How much media to keep locally.")}
           icon={<Database size={17} />}
         >
-          <p className="font-mono text-lg tabular-nums text-ink">{cacheReset ? t("по умолчанию") : `${cacheLimit} ${t("ГБ")}`}</p>
-          <GlassButton
-            tone="glass"
-            onClick={() => { setCacheLimit(20); setCacheReset(true); }}
-            className="mt-2 h-8 px-3 text-[11px] font-medium"
-          >
-            {t("Сбросить кэш")}
-          </GlassButton>
+          <p className="font-mono text-lg tabular-nums text-ink">{cacheGb} {t("ГБ")}</p>
+          <input
+            type="range"
+            min={1}
+            max={50}
+            value={cacheGb}
+            onChange={(event) => setCacheGb(Number(event.target.value))}
+            className="mt-1 w-full accent-[var(--accent)]"
+            aria-label={t("Лимит кэша")}
+          />
+          <div className="mt-2 grid gap-1.5">
+            <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted">{t("Автоскачивание медиа")}</span>
+            <div className="flex gap-1 rounded-full bg-surface/60 p-1">
+              {([["wifi", t("Только Wi-Fi")], ["always", t("Всегда")]] as const).map(([id, label]) => (
+                <button key={id} type="button" aria-pressed={autoDownload === id} onClick={() => setAutoDownload(id)} className={`flex-1 rounded-full px-2 py-1 text-[11px] transition ${autoDownload === id ? "bg-accent/10 text-accent" : "text-muted"}`}>{label}</button>
+              ))}
+            </div>
+            <GlassButton tone="danger" onClick={() => void clearCache()} disabled={cacheBusy} className="mt-1 h-8 px-3 text-[11px] font-medium">
+              {cacheBusy ? <Loader2 size={12} className="animate-spin" /> : null}{t("Очистить кэш")}
+            </GlassButton>
+            {cacheNotice && <p className="text-[10px] text-muted">{cacheNotice}</p>}
+          </div>
         </BentoCard>
 
         <BentoCard
