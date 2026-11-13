@@ -8,6 +8,7 @@ import { escapeHtml, studioWidgets, widgetAccents, widgetCategories, widgetPost,
 import { MediaLibrary } from "./studio/MediaLibrary";
 import { ScheduledPosts } from "./studio/ScheduledPosts";
 import { StickerStudio } from "./studio/StickerStudio";
+import { StickerWizard } from "./studio/StickerWizard";
 
 type StudioSection = "widgets" | "stickers" | "media" | "scheduled";
 
@@ -172,7 +173,10 @@ export function ChannelStudio({ channelId, channelTitle, initialSection = "widge
           </div>
         </div>
       ) : section === "stickers" ? (
+        <div className="grid gap-3">
+        <StickerWizard channelId={channelId} />
         <StickerStudio channelId={channelId} />
+      </div>
       ) : section === "media" ? (
         <MediaLibrary channelId={channelId} />
       ) : (

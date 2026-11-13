@@ -539,6 +539,25 @@ export const api = {
       return request<MessageRecord>(`/editor/channels/${channelId}/photos`, { method: "POST", body: form });
     },
   },
+  stickers: {
+    create: (file: File, options: { title?: string; removeBg?: boolean; emoji?: string } = {}) => {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("title", options.title ?? "Aurogram sticker");
+      form.append("remove_bg", String(options.removeBg ?? true));
+      form.append("emoji", options.emoji ?? "⭐");
+      return request<{
+        status: string;
+        name: string;
+        link: string;
+        count: number;
+        removed_background: boolean;
+        notified: boolean;
+        size_bytes: number;
+      }>("/stickers/create", { method: "POST", body: form });
+    },
+    hint: () => request<{ status: string; sent: boolean }>("/stickers/hint", { method: "POST", body: json({}) }),
+  },
   settings: {
     get: () => request<UiSettings>("/settings"),
     patch: (payload: Partial<UiSettings>) =>
