@@ -17,6 +17,48 @@ from app.models import MessageOut
 from app.telegram.media import download_message_media, ensure_thumbnail, resolve_media_file
 from app.telegram.messages import delete_message, list_messages, react_to_message, send_message, send_video_note, set_message_pinned
 
+import asyncio
+import logging
+
+from telethon.errors import ChannelPrivateError, FloodWaitError, ServerError
+
+log = logging.getLogger("aurogram.messages")
+
+
+async def _safe_list_messages(account: dict, chat_id: int, limit: int, offset_id: int, ghost: bool):
+    """Загружает сообщения, не роняя API на ошибках Telegram.
+
+    FloodWait — ждём и пробуем ещё раз; приватный канал / сбой сервера —
+    отдаём пустой список (фронтенд покажет «нет сообщений», а не 500).
+    """
+    try:
+        return await list_messages(
+            account, chat_id, limit=limit, offset_id=offset_id, ghost=ghost
+        )
+    except FloodWaitError as exc:
+        wait = int(getattr(exc, "seconds", 0) or 0)
+        log.warning("messages: floodwait %ss for chat %s", wait, chat_id)
+        await asyncio.sleep(min(wait, 60))
+        try:
+            return await list_messages(
+                account, chat_id, limit=limit, offset_id=offset_id, ghost=ghost
+            )
+        except Exception as retry_exc:  # noqa: BLE001
+            log.warning("messages retry failed: %s", retry_exc)
+            raise HTTPException(
+                status_code=429,
+                detail=f"Telegram просит подождать {wait} секунд",
+                headers={"Retry-After": str(wait)},
+            ) from retry_exc
+    except ChannelPrivateError as exc:
+        log.warning("messages: channel %s is private: %s", chat_id, exc)
+        return []
+    except ServerError as exc:
+        log.warning("messages: telegram server error for %s: %s", chat_id, exc)
+        return []
+
+
+
 router = APIRouter(prefix="/messages", tags=["messages"])
 
 
@@ -44,7 +86,7 @@ async def messages(
 ) -> list[MessageOut]:
     privacy = await fetchone("SELECT no_read_receipts FROM account_preferences WHERE account_id = ?", (account["id"],))
     ghost = bool(privacy["no_read_receipts"]) if privacy else True
-    return await list_messages(
+    return await _safe_list_messages(
         account,
         chat_id,
         limit=limit,

@@ -28,6 +28,7 @@ def api_key() -> str:
         (settings.deepseek_api_key or "").strip()
         or (settings.ai_api_key or "").strip()
         or (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+        or (os.environ.get("AI_API_KEY") or "").strip()
     )
 
 
