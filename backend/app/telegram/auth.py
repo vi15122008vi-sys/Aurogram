@@ -470,8 +470,10 @@ async def start_qr(account: Optional[dict] = None) -> dict[str, Any]:
         api_id, api_hash = resolve_api_credentials(None)
         token = new_auth_token()
         await execute(
-            "INSERT INTO accounts (id, phone, name, auth_state, token) VALUES (?, '', '', 'pending', ?)",
-            (account_id, token),
+            # phone уникален (UNIQUE(phone)): заглушка вида «pending:<id>» не конфликтует
+            # с другими QR-входами и заменяется реальным номером после подтверждения.
+            "INSERT INTO accounts (id, phone, name, auth_state, token) VALUES (?, ?, '', 'pending', ?)",
+            (account_id, f"pending:{account_id}", token),
         )
 
     preferences = await fetchone("SELECT hide_device_type FROM account_preferences WHERE account_id = ?", (account_id,))

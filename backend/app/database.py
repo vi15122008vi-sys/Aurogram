@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS accounts (
     tg_user_id INTEGER,
     created_at TEXT DEFAULT (datetime('now')),
     last_sync TEXT,
-    meta_json TEXT DEFAULT '{}'
+    meta_json TEXT DEFAULT '{}',
+    UNIQUE (phone)
 );
 
 CREATE TABLE IF NOT EXISTS account_devices (
