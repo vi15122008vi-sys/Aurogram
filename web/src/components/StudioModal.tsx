@@ -5,7 +5,7 @@ import { IntegrationsPanel } from "../screens/IntegrationsPanel";
 import { AntispamScreen } from "../screens/AntispamScreen";
 import { useI18n } from "../lib/i18n";
 
-export type StudioSection = "widgets" | "stickers" | "media" | "scheduled";
+export type StudioSection = "widgets" | "stickers" | "welcome" | "media" | "scheduled";
 type StudioMode = "studio" | "integrations" | "antispam";
 
 interface StudioModalProps {

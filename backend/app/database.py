@@ -12,6 +12,16 @@ from app.config import get_settings
 log = logging.getLogger("aurogram.database")
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS channel_welcome (
+    account_id TEXT NOT NULL,
+    channel_id INTEGER NOT NULL,
+    text TEXT DEFAULT '',
+    photo_path TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (account_id, channel_id)
+);
+
 CREATE TABLE IF NOT EXISTS account_profiles (
     account_id TEXT PRIMARY KEY,
     display_name TEXT,

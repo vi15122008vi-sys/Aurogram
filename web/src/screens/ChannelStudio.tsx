@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarClock, Check, Copy, Gamepad2, Images, Search, Send, Sticker, X } from "lucide-react";
+import { CalendarClock, Check, Copy, Gamepad2, Image, Images, Search, Send, Sticker, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { springModal } from "../lib/motion";
@@ -10,8 +10,9 @@ import { ScheduledPosts } from "./studio/ScheduledPosts";
 import { StickerStudio } from "./studio/StickerStudio";
 import { AiWidgetStudio } from "./studio/AiWidgetStudio";
 import { StickerWizard } from "./studio/StickerWizard";
+import { WelcomeEditor } from "./studio/WelcomeEditor";
 
-type StudioSection = "widgets" | "stickers" | "media" | "scheduled";
+type StudioSection = "widgets" | "stickers" | "welcome" | "media" | "scheduled";
 
 interface ChannelStudioProps {
   channelId: number;
@@ -23,6 +24,7 @@ interface ChannelStudioProps {
 const sections: { id: StudioSection; title: string; titleEn: string; hint: string; hintEn: string; icon: typeof Gamepad2; badge?: string }[] = [
   { id: "widgets", title: "HTML-Виджеты", titleEn: "HTML widgets", hint: "Игры и опросы для постов", hintEn: "Games and polls for posts", icon: Gamepad2, badge: String(studioWidgets.length) },
   { id: "stickers", title: "Стикеры", titleEn: "Stickers", hint: "Генератор и стикерпаки", hintEn: "Generator and packs", icon: Sticker },
+  { id: "welcome", title: "Приветствие", titleEn: "Welcome", hint: "Текст и фото для новичков", hintEn: "Text and photo for newcomers", icon: Image },
   { id: "media", title: "Медиа-библиотека", titleEn: "Media library", hint: "Фото и видео канала", hintEn: "Channel photos and videos", icon: Images },
   { id: "scheduled", title: "Отложенные посты", titleEn: "Scheduled posts", hint: "Календарь публикаций", hintEn: "Publishing calendar", icon: CalendarClock },
 ];
@@ -181,6 +183,8 @@ export function ChannelStudio({ channelId, channelTitle, initialSection = "widge
         <StickerWizard channelId={channelId} />
         <StickerStudio channelId={channelId} />
       </div>
+      ) : section === "welcome" ? (
+        <WelcomeEditor channelId={channelId} />
       ) : section === "media" ? (
         <MediaLibrary channelId={channelId} />
       ) : (

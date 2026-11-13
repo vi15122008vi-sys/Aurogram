@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from telethon import events
@@ -135,6 +136,34 @@ async def _on_new_message(account: dict, event: Any) -> None:
             log.warning("push notification failed account %s: %s", account["id"][:8], e)
 
 
+async def _on_chat_action(account: dict, client: Any, event: Any) -> None:
+    """Отправляет приветствие, когда в чат/группу вступает новый участник."""
+    try:
+        joined = bool(getattr(event, "user_joined", False) or getattr(event, "user_added", False))
+        if not joined:
+            return
+        chat_id = getattr(event, "chat_id", None)
+        if not chat_id:
+            return
+        row = await fetchone(
+            "SELECT text, photo_path, enabled FROM channel_welcome WHERE account_id = ? AND channel_id = ?",
+            (account["id"], chat_id),
+        )
+        if not row or not row["enabled"]:
+            return
+        text = (row["text"] or "").strip()
+        photo = row["photo_path"]
+        user = getattr(event, "user", None)
+        greeting = text.replace("{name}", (getattr(user, "first_name", "") or "")) if text else None
+        if photo and Path(photo).exists():
+            await client.send_file(chat_id, photo, caption=greeting or "")
+        elif greeting:
+            await client.send_message(chat_id, greeting)
+        log.info("welcome sent to chat %s (account %s)", chat_id, account["id"][:8])
+    except Exception as exc:  # приветствие не должно ронять listener
+        log.warning("welcome failed: %s", exc)
+
+
 async def _run_account(account: dict, device_id: str) -> None:
     global _status, _errors_24h
     try:
@@ -144,6 +173,10 @@ async def _run_account(account: dict, device_id: str) -> None:
         @client.on(events.NewMessage)
         async def handler(event: Any) -> None:  # noqa: ANN401
             await _on_new_message(account, event)
+
+        @client.on(events.ChatAction)
+        async def welcome_handler(event: Any) -> None:  # noqa: ANN401
+            await _on_chat_action(account, client, event)
 
         log.info("account %s device %s: listening", account["id"][:8], device_id[:8])
         await client.run_until_disconnected()

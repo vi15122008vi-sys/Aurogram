@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Bold, Bot, Code2, Eye, Italic, Link2, List, Send, Sparkles, Timer, Underline } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { api, type AiSummary, type EditorPreview } from "../lib/api";
+import { api, type AiSummary, type ChannelRecord, type EditorPreview } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
 interface PostEditorProps {
@@ -15,6 +15,8 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
   const { t, locale } = useI18n();
   const [text, setText] = useState("");
   const [scheduleAt, setScheduleAt] = useState("");
+  const [channels, setChannels] = useState<ChannelRecord[]>([]);
+  const [selectedChannels, setSelectedChannels] = useState<number[]>([channelId]);
   const [preview, setPreview] = useState<EditorPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +113,29 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
     }
   }
 
+  useEffect(() => {
+    let active = true;
+    api.channels
+      .list()
+      .then((list) => {
+        if (!active) return;
+        setChannels(list);
+        setSelectedChannels((current) =>
+          current.includes(channelId) ? current : [channelId, ...current],
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [channelId]);
+
+  function toggleChannel(id: number) {
+    setSelectedChannels((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
+
   async function publish(schedule: boolean) {
     if (!text.trim() || text.length > 32768) return;
     if (schedule && !scheduleAt) {
@@ -122,15 +147,31 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
     setNotice(null);
     setPremiumNotice(null);
     try {
-      await api.editor.publish(channelId, {
-        text,
-        parse_mode: "md",
-        schedule_at: schedule ? new Date(scheduleAt).toISOString() : null,
-      });
+      const targets = selectedChannels.length ? selectedChannels : [channelId];
+      const failures: string[] = [];
+      for (const target of targets) {
+        try {
+          await api.editor.publish(target, {
+            text,
+            parse_mode: "md",
+            schedule_at: schedule ? new Date(scheduleAt).toISOString() : null,
+          });
+        } catch (cause) {
+          failures.push(`${target}: ${cause instanceof Error ? cause.message : "error"}`);
+        }
+      }
+      if (failures.length === targets.length) {
+        throw new Error(failures.join("; "));
+      }
       setText("");
       setScheduleAt("");
       setPreview(null);
-      setNotice(schedule ? t("Пост добавлен в расписание") : t("Пост опубликован"));
+      setNotice(
+        targets.length > 1
+          ? `${schedule ? t("Запланировано", "Scheduled") : t("Опубликовано", "Published")}: ${targets.length - failures.length}/${targets.length}`
+          : schedule ? t("Пост добавлен в расписание") : t("Пост опубликован"),
+      );
+      if (failures.length) setError(failures.join("; "));
       onPublished?.();
     } catch (cause) {
       setError(t(cause instanceof Error ? cause.message : "Не удалось отправить пост"));
@@ -242,6 +283,28 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
         {error && <p role="alert" className="mx-3 mb-3 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         {premiumNotice && <div role="status" className="mx-3 mb-3 flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2.5 text-sm text-ink"><Sparkles size={16} className="mt-0.5 shrink-0 text-accent" /><span>{premiumNotice}</span></div>}
         {notice && <p role="status" className="mx-3 mb-3 rounded-lg border border-line bg-success/10 px-3 py-2 text-sm text-success">{notice}</p>}
+        <div className="border-t border-line px-3 py-2.5">
+          <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted">Каналы для публикации</p>
+          <div className="flex flex-wrap gap-1.5">
+            {(channels.length ? channels : [{ id: channelId, title: `#${channelId}` } as ChannelRecord]).map((channel) => {
+              const active = selectedChannels.includes(channel.id);
+              return (
+                <button
+                  key={channel.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleChannel(channel.id)}
+                  className={`inline-flex max-w-[220px] items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition ${active ? "bg-accent/10 text-accent" : "bg-surface/50 text-muted hover:text-ink"}`}
+                >
+                  <span className={`grid size-3.5 place-items-center rounded-[4px] border text-[9px] ${active ? "border-accent bg-accent text-white" : "border-[color-mix(in_srgb,var(--ink)_25%,transparent)]"}`}>
+                    {active ? "✓" : ""}
+                  </span>
+                  <span className="truncate">{channel.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="flex flex-col gap-3 border-t border-line p-3 sm:flex-row sm:items-center">
           <label className={`flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-surface/60 px-3.5 text-xs transition ${focusSchedule && !scheduleAt ? "text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_40%,transparent)]" : "text-muted"}`}>
             <Timer size={15} />

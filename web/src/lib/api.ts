@@ -453,6 +453,15 @@ export const api = {
     list: () => request<ChannelRecord[]>("/channels"),
     admined: () => request<ChannelRecord[]>("/channels/admined"),
     get: (channelId: number) => request<ChannelDetails>(`/channels/${channelId}`),
+    welcome: {
+      get: (channelId: number) =>
+        request<{ text: string; enabled: boolean; has_photo: boolean; updated_at: string | null }>(`/channels/${channelId}/welcome`),
+      save: (channelId: number, payload: { text: string; enabled: boolean; photo_data_url?: string | null }) =>
+        request<{ text: string; enabled: boolean; has_photo: boolean; updated_at: string | null }>(`/channels/${channelId}/welcome`, {
+          method: "PUT",
+          body: json(payload),
+        }),
+    },
     integrations: {
       get: (channelId: number) => request<ChannelIntegrations>(`/channels/${channelId}/integrations`),
       save: (channelId: number, payload: { discord_webhook?: string; vk_token?: string; vk_group_id?: string }) =>

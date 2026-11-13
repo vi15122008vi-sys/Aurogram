@@ -5,6 +5,7 @@ import io
 import json
 import re
 import secrets
+from pathlib import Path
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -14,6 +15,7 @@ from app.antispam.checker import check_message
 from app.antispam.log import metrics_24h, read_log
 from app.antispam.settings import dump_settings, load_channel_settings
 from app.antispam.stopwords import add_history, ensure_seeded, list_words, load_builtin
+from app.config import get_settings
 from app.database import execute, fetchall, fetchone
 from app.deps import decrypt_secret, encrypt_secret, get_current_account
 from app.models import (
@@ -443,3 +445,61 @@ async def antispam_metrics(
     account: dict[str, Any] = Depends(get_current_account),
 ) -> dict[str, int]:
     return await metrics_24h(account["id"], channel_id)
+
+
+class WelcomePayload(BaseModel):
+    text: str = Field(default="", max_length=1024)
+    enabled: bool = True
+    photo_data_url: Optional[str] = None
+
+
+@router.get("/{channel_id}/welcome")
+async def get_welcome(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    row = await fetchone(
+        "SELECT text, photo_path, enabled, updated_at FROM channel_welcome WHERE account_id = ? AND channel_id = ?",
+        (account["id"], channel_id),
+    )
+    if not row:
+        return {"text": "", "enabled": True, "has_photo": False, "updated_at": None}
+    return {
+        "text": row["text"] or "",
+        "enabled": bool(row["enabled"]),
+        "has_photo": bool(row["photo_path"]),
+        "updated_at": row["updated_at"],
+    }
+
+
+@router.put("/{channel_id}/welcome")
+async def save_welcome(
+    channel_id: int,
+    payload: WelcomePayload,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    photo_path: Optional[str] = None
+    if payload.photo_data_url:
+        import base64
+        import re as _re
+
+        match = _re.match(r"^data:image/(png|jpe?g|webp);base64,(.+)$", payload.photo_data_url)
+        if not match:
+            raise HTTPException(status_code=422, detail="Ожидается data-url картинки")
+        raw = base64.b64decode(match.group(2)[: 3_000_000])
+        directory = Path(get_settings().media_dir) / account["id"] / "welcome"
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / f"{channel_id}.img"
+        target.write_bytes(raw)
+        photo_path = str(target)
+    await execute(
+        """INSERT INTO channel_welcome (account_id, channel_id, text, photo_path, enabled, updated_at)
+           VALUES (?, ?, ?, COALESCE(?, NULL), ?, datetime('now'))
+           ON CONFLICT(account_id, channel_id) DO UPDATE SET
+               text = excluded.text,
+               photo_path = COALESCE(excluded.photo_path, channel_welcome.photo_path),
+               enabled = excluded.enabled,
+               updated_at = datetime('now')""",
+        (account["id"], channel_id, payload.text.strip(), photo_path, 1 if payload.enabled else 0),
+    )
+    return await get_welcome(channel_id, account)
