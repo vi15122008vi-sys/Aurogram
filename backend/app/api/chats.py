@@ -10,7 +10,7 @@ from app.deps import get_current_account
 from app.database import execute, fetchall
 from app.cache.manager import search_cached
 from app.models import ChatOut, MemberOut, MessageOut
-from app.telegram.chats import get_chat, get_story_avatar, get_story_media, list_chats, list_stories
+from app.telegram.chats import get_chat, get_story_avatar, get_story_media, list_chats, list_stories, read_stories
 from app.telegram.members import list_admins, list_members
 from app.telegram.messages import delete_message, list_messages, send_message
 
@@ -28,6 +28,10 @@ def telegram_error(exc: Exception) -> HTTPException:
             detail="Сессия Telegram недействительна. Войдите в аккаунт заново.",
         )
     return HTTPException(status_code=502, detail="Telegram не ответил. Попробуйте позже.")
+
+
+class StoryReadRequest(BaseModel):
+    story_ids: list[int] = Field(default_factory=list, max_length=50)
 
 
 class MessageCreate(BaseModel):
@@ -142,12 +146,26 @@ async def story_media(
     account: dict[str, Any] = Depends(get_current_account),
 ) -> Response:
     try:
-        image = await get_story_media(account, peer_id, story_id)
+        result = await get_story_media(account, peer_id, story_id)
     except Exception as exc:
         raise telegram_error(exc) from exc
-    if not image:
+    if not result:
         raise HTTPException(status_code=404, detail="Медиа истории не найдено")
-    return Response(content=image, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
+    content, media_type = result
+    return Response(content=content, media_type=media_type, headers={"Cache-Control": "private, max-age=300"})
+
+
+@router.post("/stories/{peer_id}/read")
+async def story_read(
+    peer_id: int,
+    payload: StoryReadRequest,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    try:
+        read_until = await read_stories(account, peer_id, payload.story_ids)
+    except Exception as exc:
+        raise telegram_error(exc) from exc
+    return {"status": "ok", "read_until": read_until}
 
 
 @router.get("/stories/{peer_id}/avatar")

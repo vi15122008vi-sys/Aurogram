@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, ImageOff, X } from "lucide-react";
-import { storyAvatarUrl, storyMediaUrl, type StoryPeer } from "../lib/api";
+import { api, storyAvatarUrl, storyMediaUrl, type StoryPeer } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 
 interface StoryViewerProps {
@@ -8,10 +8,12 @@ interface StoryViewerProps {
   index: number;
   onIndexChange: (index: number) => void;
   onClose: () => void;
+  /** Вызывается после того, как Telegram подтвердил прочтение. */
+  onRead?: (peerId: number) => void;
 }
 
 /** Полноэкранный просмотр истории: медиа с /chats/stories/{id}/media или заглушка. */
-export function StoryViewer({ stories, index, onIndexChange, onClose }: StoryViewerProps) {
+export function StoryViewer({ stories, index, onIndexChange, onClose, onRead }: StoryViewerProps) {
   const { t } = useI18n();
   const story = stories[index];
   const [failed, setFailed] = useState(false);
@@ -19,6 +21,24 @@ export function StoryViewer({ stories, index, onIndexChange, onClose }: StoryVie
   useEffect(() => {
     setFailed(false);
   }, [story?.peer_id, story?.latest_story_id]);
+
+  // Показ истории = прочтение: stories.ReadStoriesRequest на бэкенде,
+  // после ответа гасим градиентную обводку (unread -> false).
+  useEffect(() => {
+    if (!story) return;
+    let active = true;
+    api.chats
+      .readStories(story.peer_id, [story.latest_story_id])
+      .then(() => {
+        if (active) onRead?.(story.peer_id);
+      })
+      .catch(() => {
+        // Не критично: обводка останется, повторим при следующем открытии.
+      });
+    return () => {
+      active = false;
+    };
+  }, [story?.peer_id, story?.latest_story_id, onRead]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -44,14 +64,27 @@ export function StoryViewer({ stories, index, onIndexChange, onClose }: StoryVie
         className="glass-modal relative flex h-[min(78vh,640px)] w-full max-w-sm flex-col overflow-hidden p-0"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative flex-1 bg-[color-mix(in_srgb,var(--ink)_8%,transparent)]">
+        <div className="relative flex-1 overflow-hidden rounded-[20px] bg-[color-mix(in_srgb,var(--ink)_8%,transparent)]">
           {story.count > 0 && !failed ? (
-            <img
-              src={storyMediaUrl(story.peer_id, story.latest_story_id)}
-              alt={story.title}
-              onError={() => setFailed(true)}
-              className="size-full object-contain"
-            />
+            story.media_kind === "video" ? (
+              <video
+                key={`${story.peer_id}:${story.latest_story_id}`}
+                src={storyMediaUrl(story.peer_id, story.latest_story_id)}
+                controls
+                autoPlay
+                playsInline
+                muted
+                onError={() => setFailed(true)}
+                className="size-full rounded-[20px] bg-black object-contain"
+              />
+            ) : (
+              <img
+                src={storyMediaUrl(story.peer_id, story.latest_story_id)}
+                alt={story.title}
+                onError={() => setFailed(true)}
+                className="size-full rounded-[20px] object-contain"
+              />
+            )
           ) : (
             <div className="grid size-full place-items-center bg-gradient-to-br from-fuchsia-500/30 via-accent/30 to-amber-400/30">
               <div className="flex flex-col items-center gap-2 text-ink/80">

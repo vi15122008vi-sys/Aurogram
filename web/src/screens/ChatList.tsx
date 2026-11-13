@@ -369,6 +369,9 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
           index={storyIndex}
           onIndexChange={(next) => setStoryIndex(Math.max(0, Math.min(stories.length - 1, next)))}
           onClose={() => setStoryIndex(null)}
+          onRead={(peerId) =>
+            setStories((current) => current.map((item) => (item.peer_id === peerId ? { ...item, unread: false } : item)))
+          }
         />
       )}
     </section>

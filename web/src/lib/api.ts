@@ -88,6 +88,8 @@ export interface StoryPeer {
   count: number;
   unread: boolean;
   latest_story_id: number;
+  has_media?: boolean;
+  media_kind?: "photo" | "video" | null;
 }
 
 export interface ChannelDetails {
@@ -444,6 +446,11 @@ export const api = {
   chats: {
     list: (archived = false) => request<ChatRecord[]>(`/chats?archived=${archived}`),
     stories: () => request<StoryPeer[]>("/chats/stories"),
+    readStories: (peerId: number, storyIds: number[]) =>
+      request<{ status: string; read_until: number }>(`/chats/stories/${peerId}/read`, {
+        method: "POST",
+        body: json({ story_ids: storyIds }),
+      }),
     folders: () => request<ChatFolder[]>("/chats/folders"),
     createFolder: (name: string) => request<ChatFolder>("/chats/folders", { method: "POST", body: json({ name }) }),
     assignFolder: (chatId: number, folderId: number | null) => request<{ chat_id: number; folder_id: number | null }>(`/chats/${chatId}/folder`, { method: "PUT", body: json({ folder_id: folderId }) }),

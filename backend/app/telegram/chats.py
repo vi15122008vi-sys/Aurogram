@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from telethon.tl.types import Channel, Chat, User
 from telethon import utils
-from telethon.tl.functions.stories import GetAllStoriesRequest, GetPeerStoriesRequest
+from telethon.tl.functions.stories import GetAllStoriesRequest, GetPeerStoriesRequest, ReadStoriesRequest
 
 from app.models import ChatOut
 from app.cache.manager import upsert_message
@@ -102,7 +102,21 @@ def _story_entry(peer_id: int, entity: Any, peer_stories: Any) -> Optional[dict[
         "latest_story_id": latest_id,
         # Фронтенд решает, показывать превью истории или градиентную заглушку.
         "has_media": getattr(latest, "media", None) is not None,
+        "media_kind": _media_kind(getattr(latest, "media", None)),
     }
+
+
+def _media_kind(media: Any) -> Optional[str]:
+    """Тип медиа истории: photo / video (None — истории без вложения)."""
+    if media is None:
+        return None
+    document = getattr(media, "document", None)
+    mime = getattr(document, "mime_type", "") or ""
+    if mime.startswith("video") or getattr(media, "video", False):
+        return "video"
+    if getattr(media, "photo", None) is not None or mime.startswith("image"):
+        return "photo"
+    return None
 
 
 async def get_peer_stories(account: dict, peer_id: int) -> Optional[dict[str, Any]]:
@@ -155,7 +169,7 @@ async def get_story_avatar(account: dict, peer_id: int) -> bytes | None:
     return await with_floodwait(lambda: client.download_profile_photo(entity))
 
 
-async def get_story_media(account: dict, peer_id: int, story_id: int = 0) -> bytes | None:
+async def get_story_media(account: dict, peer_id: int, story_id: int = 0) -> tuple[bytes, str] | None:
     """Медиа конкретной истории: stories.GetPeerStoriesRequest → download_media.
 
     Если истории с таким id нет (или у неё нет медиа) — отдаём профильное фото,
@@ -174,9 +188,33 @@ async def get_story_media(account: dict, peer_id: int, story_id: int = 0) -> byt
         target = max(stories, key=lambda item: int(getattr(item, "id", 0)))
     media = getattr(target, "media", None) if target is not None else None
     if media is None:
-        return await with_floodwait(lambda: client.download_profile_photo(entity))
+        photo = await with_floodwait(lambda: client.download_profile_photo(entity))
+        return (bytes(photo), "image/jpeg") if photo else None
     data = await with_floodwait(lambda: client.download_media(media, file=bytes))
-    return bytes(data) if isinstance(data, (bytes, bytearray)) else None
+    if not isinstance(data, (bytes, bytearray)):
+        return None
+    kind = _media_kind(media)
+    mime = "video/mp4" if kind == "video" else "image/jpeg"
+    document = getattr(media, "document", None)
+    document_mime = getattr(document, "mime_type", "") or ""
+    if document_mime:
+        mime = document_mime
+    return bytes(data), mime
+
+
+async def read_stories(account: dict, peer_id: int, story_ids: list[int]) -> int:
+    """Отметить истории прочитанными: stories.ReadStoriesRequest(peer, max_id).
+
+    У Telegram нет «списка id» — читается всё до максимального id,
+    поэтому передаём самый свежий из запрошенных.
+    """
+    if not story_ids:
+        return 0
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(peer_id))
+    max_id = int(max(story_ids))
+    await with_floodwait(lambda: client(ReadStoriesRequest(peer=entity, max_id=max_id)))
+    return max_id
 
 
 async def get_chat(account: dict, chat_id: int) -> Optional[ChatOut]:
