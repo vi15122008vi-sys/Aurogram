@@ -453,6 +453,12 @@ export const api = {
     list: () => request<ChannelRecord[]>("/channels"),
     admined: () => request<ChannelRecord[]>("/channels/admined"),
     get: (channelId: number) => request<ChannelDetails>(`/channels/${channelId}`),
+    access: (channelId: number) => request<{ is_admin: boolean }>(`/channels/${channelId}/access`),
+    movePost: (channelId: number, postId: number, scheduleAt: string) =>
+      request<{ status: string; post_id: number; schedule_at: string }>(
+        `/channels/${channelId}/posts/${postId}/schedule`,
+        { method: "PATCH", body: json({ schedule_at: scheduleAt }) },
+      ),
     welcome: {
       photoUrl: (channelId: number, version = 0) =>
         apiUrl(`/channels/${channelId}/welcome/photo${version ? `?v=${version}` : ""}`),
@@ -540,7 +546,7 @@ export const api = {
     capabilities: () => request<EditorCapabilities>("/editor/capabilities"),
     preview: (markdown: string) =>
       request<EditorPreview>("/editor/preview", { method: "POST", body: json({ markdown }) }),
-    publish: (channelId: number, payload: { text: string; parse_mode: "md" | "html"; schedule_at: string | null }) =>
+    publish: (channelId: number, payload: { text: string; parse_mode: "md" | "html"; schedule_at: string | null; buttons?: { text: string; url: string }[] }) =>
       request<MessageRecord>(`/editor/channels/${channelId}/posts`, { method: "POST", body: json(payload) }),
     scheduled: (channelId: number) => request<MessageRecord[]>(`/editor/channels/${channelId}/scheduled`),
     publishPhoto: (channelId: number, photo: Blob, caption = "") => {

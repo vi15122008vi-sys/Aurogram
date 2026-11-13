@@ -13,6 +13,7 @@ from app.editor.capabilities import capabilities
 from app.editor.rich_editor import preview
 from app.integrations.crosspost import deliver
 from app.models import EditorPreviewRequest, MessageOut, PostCreate
+from telethon.tl.custom import Button
 from app.telegram.client import get_client
 from app.telegram.floodwait import with_floodwait
 from app.telegram.messages import list_scheduled, send_photo, to_out
@@ -59,6 +60,11 @@ async def publish_post(
             parse_mode=payload.parse_mode,
             schedule=payload.schedule_at,
             silent=payload.silent,
+            buttons=(
+                [[Button.url(item.text, item.url) for item in payload.buttons]]
+                if payload.buttons
+                else None
+            ),
         )
     )
     # Кросс-постинг только для немедленных публикаций: отложенные отправит

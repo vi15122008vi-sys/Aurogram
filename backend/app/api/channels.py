@@ -482,6 +482,19 @@ class WelcomePayload(BaseModel):
     photo_data_url: Optional[str] = None
 
 
+@router.get("/{channel_id}/access")
+async def channel_access(
+    channel_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    """Есть ли у аккаунта права администратора канала (для скрытия админ-UI)."""
+    try:
+        await _require_channel_admin(account, channel_id)
+        return {"is_admin": True}
+    except HTTPException:
+        return {"is_admin": False}
+
+
 @router.get("/{channel_id}/welcome")
 async def get_welcome(
     channel_id: int,
@@ -550,3 +563,44 @@ async def save_welcome(
         (account["id"], channel_id, payload.text.strip(), photo_path, 1 if payload.enabled else 0),
     )
     return await get_welcome(channel_id, account)
+
+
+class ScheduleMove(BaseModel):
+    schedule_at: str
+
+
+@router.patch("/{channel_id}/posts/{post_id}/schedule")
+async def move_scheduled_post(
+    channel_id: int,
+    post_id: int,
+    payload: ScheduleMove,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    """Перенос даты отложенного поста (Telethon EditMessageRequest + schedule_date)."""
+    from datetime import datetime, timezone
+
+    from telethon.tl.functions.messages import EditMessageRequest
+
+    await _require_channel_admin(account, channel_id)
+    try:
+        target = datetime.fromisoformat(payload.schedule_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Ожидается ISO-дата") from exc
+    if target.tzinfo is None:
+        target = target.replace(tzinfo=timezone.utc)
+    if target <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=422, detail="Дата должна быть в будущем")
+
+    client = await get_client(account["id"], account)
+    try:
+        message = await with_floodwait(lambda: client.get_messages(channel_id, ids=post_id))
+        text = getattr(message, "message", "") or ""
+        entity = await client.get_input_entity(channel_id)
+        await with_floodwait(
+            lambda: client(
+                EditMessageRequest(peer=entity, id=post_id, message=text, schedule_date=target)
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Не удалось перенести пост: {exc}") from exc
+    return {"status": "ok", "post_id": post_id, "schedule_at": target.isoformat()}

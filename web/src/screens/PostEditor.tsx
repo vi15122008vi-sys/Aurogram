@@ -17,6 +17,7 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
   const [scheduleAt, setScheduleAt] = useState("");
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<number[]>([channelId]);
+  const [postButtons, setPostButtons] = useState<{ text: string; url: string }[]>([]);
   const [preview, setPreview] = useState<EditorPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +156,7 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
             text,
             parse_mode: "md",
             schedule_at: schedule ? new Date(scheduleAt).toISOString() : null,
+            buttons: postButtons.filter((item) => item.text.trim() && /^https?:\/\//.test(item.url.trim())),
           });
         } catch (cause) {
           failures.push(`${target}: ${cause instanceof Error ? cause.message : "error"}`);
@@ -283,6 +285,50 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
         {error && <p role="alert" className="mx-3 mb-3 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
         {premiumNotice && <div role="status" className="mx-3 mb-3 flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2.5 text-sm text-ink"><Sparkles size={16} className="mt-0.5 shrink-0 text-accent" /><span>{premiumNotice}</span></div>}
         {notice && <p role="status" className="mx-3 mb-3 rounded-lg border border-line bg-success/10 px-3 py-2 text-sm text-success">{notice}</p>}
+        <div className="border-t border-line px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted">Добавить кнопку</p>
+            <button
+              type="button"
+              onClick={() => setPostButtons((current) => [...current, { text: "", url: "" }].slice(0, 10))}
+              className="inline-flex h-7 items-center rounded-full bg-accent/10 px-2.5 text-[11px] font-medium text-accent transition hover:bg-accent/15"
+            >
+              + Кнопка
+            </button>
+          </div>
+          {postButtons.length === 0 ? (
+            <p className="mt-1 text-[10px] text-muted">Inline-кнопки под постом: текст + ссылка (до 10).</p>
+          ) : (
+            <div className="mt-2 grid gap-1.5">
+              {postButtons.map((button, index) => (
+                <div key={index} className="flex gap-1.5">
+                  <input
+                    value={button.text}
+                    onChange={(event) => setPostButtons((current) => current.map((item, i) => i === index ? { ...item, text: event.target.value } : item))}
+                    placeholder="Сайт"
+                    maxLength={64}
+                    className="h-8 w-28 rounded-[10px] bg-surface/60 px-2 text-[11px] text-ink outline-none"
+                  />
+                  <input
+                    value={button.url}
+                    onChange={(event) => setPostButtons((current) => current.map((item, i) => i === index ? { ...item, url: event.target.value } : item))}
+                    placeholder="https://example.com"
+                    className="h-8 min-w-0 flex-1 rounded-[10px] bg-surface/60 px-2 font-mono text-[11px] text-ink outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPostButtons((current) => current.filter((_, i) => i !== index))}
+                    aria-label="Удалить кнопку"
+                    className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-danger/10 text-danger"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="border-t border-line px-3 py-2.5">
           <p className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted">Каналы для публикации</p>
           <div className="flex flex-wrap gap-1.5">

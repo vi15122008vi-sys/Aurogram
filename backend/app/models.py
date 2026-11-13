@@ -235,11 +235,17 @@ class DomainIn(BaseModel):
     domain: str
 
 
+class PostButton(BaseModel):
+    text: str = Field(min_length=1, max_length=64)
+    url: str = Field(min_length=8, max_length=512)
+
+
 class PostCreate(BaseModel):
     text: str
     parse_mode: Literal["html", "md"] = "html"
     schedule_at: Optional[datetime] = None
     silent: bool = False
+    buttons: list[PostButton] = Field(default_factory=list, max_length=10)
 
 
 class EditorPreviewRequest(BaseModel):
