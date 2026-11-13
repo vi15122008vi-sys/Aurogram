@@ -4,6 +4,7 @@ from datetime import timezone
 from typing import Any, Optional
 
 from telethon import utils
+from telethon.errors import RPCError
 from telethon.tl.functions.channels import GetAdminedPublicChannelsRequest, GetFullChannelRequest
 from telethon.tl.types import Channel
 
@@ -16,6 +17,7 @@ async def list_channels(account: dict) -> list[ChannelOut]:
     client = await get_client(account["id"], account)
     dialogs = await with_floodwait(lambda: client.get_dialogs(limit=200))
     out: list[ChannelOut] = []
+    seen: set[int] = set()
     for d in dialogs:
         entity = d.entity
         if not isinstance(entity, Channel) or not getattr(entity, "broadcast", False):
@@ -31,6 +33,7 @@ async def list_channels(account: dict) -> list[ChannelOut]:
             # Просмотры последнего поста — единственная метрика охвата,
             # которую Telegram отдаёт без отдельного stats-запроса.
             views = int(getattr(last, "views", 0) or 0)
+        seen.add(int(getattr(entity, "id", d.id)))
         out.append(
             ChannelOut(
                 id=d.id,
@@ -39,6 +42,39 @@ async def list_channels(account: dict) -> list[ChannelOut]:
                 subscribers=getattr(entity, "participants_count", 0) or 0,
                 last_post_at=last_at,
                 views=views,
+            )
+        )
+    out.extend(await _admined_channels_missing_in_dialogs(client, seen))
+    return out
+
+
+async def _admined_channels_missing_in_dialogs(client: Any, seen: set[int]) -> list[ChannelOut]:
+    """Каналы, где аккаунт админ, но которых нет в окне диалогов.
+
+    GetAdminedPublicChannels возвращает только публичные каналы, зато без
+    ограничения по глубине истории диалогов — иначе «свежий» админ-канал
+    с редкими постами не попадал в раздел «Каналы».
+    """
+    try:
+        result = await with_floodwait(
+            lambda: client(GetAdminedPublicChannelsRequest(by_location=False, check_limit=False))
+        )
+    except (RPCError, ValueError):
+        return []
+    out: list[ChannelOut] = []
+    for entity in getattr(result, "chats", None) or []:
+        if not isinstance(entity, Channel) or not getattr(entity, "broadcast", False):
+            continue
+        channel_id = int(entity.id)
+        if channel_id in seen:
+            continue
+        seen.add(channel_id)
+        out.append(
+            ChannelOut(
+                id=channel_id,
+                title=entity.title or str(channel_id),
+                username=getattr(entity, "username", None),
+                subscribers=getattr(entity, "participants_count", 0) or 0,
             )
         )
     return out

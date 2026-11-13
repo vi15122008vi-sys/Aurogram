@@ -104,12 +104,12 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
     return <Settings accountName={account.name || account.phone} phone={account.phone} onLogout={onLogout} />;
   }
 
-  if (tab === "chats") {
+  if (tab === "chats" || (tab === "bots" && selectedChat)) {
     if (selectedChat) {
       return (
         <section className="animate-[rise-in_240ms_ease-out]">
-          <button type="button" onClick={() => setSelectedChat(null)} className="mb-4 inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted hover:bg-surface hover:text-ink"><ArrowLeft size={15} />{t("Чаты")}</button>
-          <div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("INBOX")} / {t(({ user: "Личный чат", group: "Группа", channel: "Канал", bot: "Бот" } as const)[selectedChat.type])}</p><h1 className="mt-1 text-[25px] font-semibold">{selectedChat.title}</h1></div>
+          <button type="button" onClick={() => setSelectedChat(null)} className="mb-4 inline-flex h-8 items-center gap-2 rounded-full px-2 text-xs font-medium text-muted hover:text-ink"><ArrowLeft size={15} />{t(tab === "bots" ? "Боты" : "Чаты")}</button>
+          <div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t(tab === "bots" ? "AUTOMATION" : "INBOX")} / {t(({ user: "Личный чат", group: "Группа", channel: "Канал", bot: "Бот" } as const)[selectedChat.type])}</p><h1 className="mt-1 text-[25px] font-semibold">{selectedChat.title}</h1></div>
           <MessageList chatId={selectedChat.id} allowSend />
         </section>
       );
@@ -149,7 +149,12 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
               </span>
               {"unread" in item && item.unread > 0 && <span className="rounded-lg bg-accent/10 px-2 py-1 font-mono text-xs text-accent">{item.unread}</span>}
             </>;
-            return <article key={item.id} className="glass-hover flex items-center gap-3 p-3">{content}</article>;
+            const openBot = tab === "bots"
+              ? () => setSelectedChat({ id: item.id, title: itemTitle(item), username: "username" in item ? item.username : null, type: "bot" as const, unread: 0, last_message: null, last_message_date: null })
+              : null;
+            return openBot
+              ? <button key={item.id} type="button" onClick={openBot} className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)]">{content}</button>
+              : <article key={item.id} className="glass-hover flex items-center gap-3 p-3">{content}</article>;
           })}
         </div>
       ) : (

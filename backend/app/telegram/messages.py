@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timezone
 from typing import Any, Optional
 
-from telethon.tl.functions.messages import SendReactionRequest
+from telethon.tl.functions.messages import GetScheduledHistoryRequest, SendReactionRequest
 from telethon.tl.types import ReactionEmoji
 
 from app.models import MessageOut
@@ -130,6 +130,24 @@ async def send_video_note(account: dict, chat_id: int, video_path: str) -> Messa
     client = await get_client(account["id"], account)
     message = await with_floodwait(lambda: client.send_file(chat_id, video_path, video_note=True, supports_streaming=True))
     return to_out(message, chat_id)
+
+
+async def send_photo(account: dict, chat_id: int, photo_path: str, caption: Optional[str] = None) -> MessageOut:
+    client = await get_client(account["id"], account)
+    message = await with_floodwait(
+        lambda: client.send_file(chat_id, photo_path, caption=caption, force_document=False)
+    )
+    return to_out(message, chat_id)
+
+
+async def list_scheduled(account: dict, chat_id: int) -> list[MessageOut]:
+    """Отложенные посты канала (папка «Запланированные» в Telegram)."""
+    client = await get_client(account["id"], account)
+    peer = await client.get_input_entity(chat_id)
+    result = await with_floodwait(lambda: client(GetScheduledHistoryRequest(peer, 0)))
+    out = [to_out(message, chat_id) for message in getattr(result, "messages", []) or [] if message]
+    out.sort(key=lambda item: item.date)
+    return out
 
 
 async def set_message_pinned(account: dict, chat_id: int, message_id: int, pinned: bool) -> MessageOut:

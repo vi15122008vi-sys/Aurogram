@@ -43,15 +43,50 @@ async def bots(account: dict[str, Any] = Depends(get_current_account)) -> list[B
         "SELECT id, username, name, webhook_url FROM bots WHERE account_id = ? ORDER BY created_at DESC",
         (account["id"],),
     )
-    return [
-        BotOut(
+    known = {
+        int(row["id"]): BotOut(
             id=row["id"],
             username=row["username"],
             name=row["name"],
             webhook_set=bool(row["webhook_url"]),
         )
         for row in rows
-    ]
+    }
+    result = list(known.values())
+    # Боты, с которыми аккаунт просто переписывался, тоже принадлежат разделу
+    # «Боты» — иначе они висели в чатах и терялись из автоматизации.
+    for bot in await _dialog_bots(account):
+        if bot.id not in known:
+            result.append(bot)
+    return result
+
+
+async def _dialog_bots(account: dict[str, Any]) -> list[BotOut]:
+    from telethon.errors import RPCError
+    from telethon.tl.types import User
+
+    from app.telegram.client import get_client
+
+    try:
+        client = await get_client(account["id"], account)
+        dialogs = await client.get_dialogs(limit=200)
+    except (RPCError, RuntimeError, OSError):
+        return []
+    out: list[BotOut] = []
+    for dialog in dialogs:
+        entity = dialog.entity
+        if not isinstance(entity, User) or not getattr(entity, "bot", False):
+            continue
+        name = " ".join(part for part in (entity.first_name, entity.last_name) if part).strip()
+        out.append(
+            BotOut(
+                id=int(entity.id),
+                username=entity.username or str(entity.id),
+                name=name or entity.username or str(entity.id),
+                webhook_set=False,
+            )
+        )
+    return out
 
 
 @router.post("", response_model=BotOut, status_code=201)

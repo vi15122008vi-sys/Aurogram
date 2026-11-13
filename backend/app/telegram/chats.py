@@ -23,6 +23,20 @@ def _chat_type(entity: Any) -> str:
     return "user"
 
 
+def _is_managed_channel(entity: Any) -> bool:
+    """Канал, которым управляет аккаунт: живёт в разделе «Каналы», не в чатах."""
+    return (
+        isinstance(entity, Channel)
+        and bool(getattr(entity, "broadcast", False))
+        and bool(getattr(entity, "creator", False) or getattr(entity, "admin_rights", None))
+    )
+
+
+def _is_bot(entity: Any) -> bool:
+    """Бот: отдельный раздел «Боты», в списке чатов не дублируется."""
+    return isinstance(entity, User) and bool(getattr(entity, "bot", False))
+
+
 def _title(entity: Any) -> str:
     if isinstance(entity, User):
         parts = [entity.first_name or "", entity.last_name or ""]
@@ -46,6 +60,10 @@ async def list_chats(
         if is_archived != archived:
             continue
         entity = d.entity
+        # Разделение режимов: админские каналы показываем в «Каналах»,
+        # ботов — в «Ботах», чтобы одна и та же сущность не дублировалась.
+        if _is_managed_channel(entity) or _is_bot(entity):
+            continue
         last = d.message
         preview = None
         last_date = None

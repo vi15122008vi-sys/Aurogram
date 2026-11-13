@@ -200,6 +200,11 @@ export function chatAvatarUrl(chatId: number): string {
   return apiUrl(`/chats/${chatId}/avatar`);
 }
 
+/** Прямая ссылка на вложение сообщения (используется в медиа-библиотеке). */
+export function messageMediaUrl(chatId: number, messageId: number): string {
+  return apiUrl(`/messages/${chatId}/${messageId}/media`);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   let deviceId = localStorage.getItem("aurogram.device_id");
@@ -361,6 +366,13 @@ export const api = {
       request<EditorPreview>("/editor/preview", { method: "POST", body: json({ markdown }) }),
     publish: (channelId: number, payload: { text: string; parse_mode: "md" | "html"; schedule_at: string | null }) =>
       request<MessageRecord>(`/editor/channels/${channelId}/posts`, { method: "POST", body: json(payload) }),
+    scheduled: (channelId: number) => request<MessageRecord[]>(`/editor/channels/${channelId}/scheduled`),
+    publishPhoto: (channelId: number, photo: Blob, caption = "") => {
+      const form = new FormData();
+      form.append("photo", photo, "sticker.png");
+      form.append("caption", caption);
+      return request<MessageRecord>(`/editor/channels/${channelId}/photos`, { method: "POST", body: form });
+    },
   },
   messages: {
     list: (chatId: number, limit = 50, offsetId = 0) =>

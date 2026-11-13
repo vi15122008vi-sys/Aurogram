@@ -1,23 +1,25 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ChartNoAxesColumn, MessageSquareText, Radio, Settings2, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, ChartNoAxesColumn, LayoutGrid, MessageSquareText, Radio, Settings2, ShieldCheck, Users } from "lucide-react";
 import { api, type ChannelDetails, type ChannelRecord } from "../lib/api";
 import { AntispamScreen } from "./AntispamScreen";
+import { ChannelStudio } from "./ChannelStudio";
 import { MessageList } from "./MessageList";
 import { PostEditor } from "./PostEditor";
 import { useI18n } from "../lib/i18n";
 
-type ChannelTab = "posts" | "stats" | "antispam" | "settings";
+type ChannelTab = "posts" | "studio" | "stats" | "antispam" | "settings";
 
 interface ChannelDetailProps {
   channel: ChannelRecord;
   onBack: () => void;
-  initialTab?: "posts" | "stats";
+  initialTab?: "posts" | "studio" | "stats";
   /** Открыть редактор сразу в режиме «Отложить» (кнопка из списка каналов). */
   initialSchedule?: boolean;
 }
 
 const tabs: { id: ChannelTab; label: string; icon: typeof Radio }[] = [
   { id: "posts", label: "Посты", icon: MessageSquareText },
+  { id: "studio", label: "Студия", icon: LayoutGrid },
   { id: "stats", label: "Статистика", icon: ChartNoAxesColumn },
   { id: "antispam", label: "Антиспам", icon: ShieldCheck },
   { id: "settings", label: "Настройки", icon: Settings2 },
@@ -79,6 +81,7 @@ export function ChannelDetail({ channel, onBack, initialTab = "posts", initialSc
       {error && <p role="alert" className="mt-4 rounded-lg border border-line bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       <div className="mt-5">
         {active === "posts" && <div className="space-y-5"><PostEditor channelId={channel.id} focusSchedule={initialSchedule} onPublished={() => setPostsReloadKey((key) => key + 1)} /><div><h2 className="mb-3 text-sm font-semibold">{t("Последние публикации")}</h2><MessageList key={`${channel.id}:${postsReloadKey}`} chatId={channel.id} pageSize={20} /></div></div>}
+        {active === "studio" && <ChannelStudio channelId={channel.id} channelTitle={title} />}
         {active === "stats" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label={t("Подписчики")} value={subscribers.toLocaleString(locale === "ru" ? "ru-RU" : "en-US")} />
           <Stat label={t("Удалено за 24 часа")} value={metrics?.deleted.toLocaleString(locale === "ru" ? "ru-RU" : "en-US") ?? "—"} />
