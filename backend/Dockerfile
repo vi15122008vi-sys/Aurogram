@@ -27,6 +27,7 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY app ./app
+COPY scripts ./scripts
 COPY supervisord.conf /app/supervisord.conf
 COPY --from=tailwind /build/admin.css /app/app/admin/static/admin.css
 
