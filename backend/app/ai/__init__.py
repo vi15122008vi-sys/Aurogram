@@ -1,5 +1,17 @@
-"""AI-функции Aurogram (суммаризация постов через бесплатную LLM)."""
+"""AI-функции Aurogram: суммаризация, вопросы по переписке, генерация виджетов."""
 
-from app.ai.client import ask_with_context, AiError, AiNotConfigured, summarize_text
+from app.ai.client import (
+    AiError,
+    AiNotConfigured,
+    ask_with_context,
+    generate_widget,
+    summarize_text,
+)
 
-__all__ = ["AiError", "AiNotConfigured", "ask_with_context", "summarize_text"]
+__all__ = [
+    "AiError",
+    "AiNotConfigured",
+    "ask_with_context",
+    "generate_widget",
+    "summarize_text",
+]

@@ -15,6 +15,7 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [html, setHtml] = useState<string | null>(null);
+  const [widgetButtons, setWidgetButtons] = useState<{ text: string; callback_data: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -28,6 +29,7 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
     try {
       const result = await api.ai.widget(value, channelId);
       setHtml(result.html);
+      setWidgetButtons(result.buttons ?? []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("AI не смог собрать виджет"));
     } finally {
@@ -107,12 +109,26 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
 
               {html && (
                 <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2">
-                  <iframe
-                    title={t("Превью виджета")}
-                    srcDoc={html}
-                    sandbox="allow-scripts"
-                    className="min-h-[240px] flex-1 rounded-[18px] bg-black/20"
-                  />
+                  <div className="rounded-[18px] bg-[color-mix(in_srgb,var(--ink)_6%,transparent)] p-2">
+                    <p className="mb-1 font-mono text-[9px] uppercase tracking-[0.14em] text-muted">{t("Так это увидят в Telegram", "This is how it looks in Telegram")}</p>
+                    <div className="overflow-hidden rounded-[14px] bg-surface/70 p-2">
+                      <iframe
+                        title={t("Превью виджета")}
+                        srcDoc={html}
+                        sandbox="allow-scripts"
+                        className="min-h-[220px] w-full rounded-[10px] bg-black/20"
+                      />
+                    </div>
+                    {widgetButtons.length > 0 && (
+                      <div className="mt-1.5 grid gap-1">
+                        {widgetButtons.map((button) => (
+                          <span key={button.callback_data} className="rounded-[10px] bg-accent/10 px-2 py-1.5 text-center text-[11px] font-medium text-accent">
+                            {button.text}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-[10px] text-muted">{html.length} {t("символов", "chars")}</span>
                     <div className="flex gap-2">

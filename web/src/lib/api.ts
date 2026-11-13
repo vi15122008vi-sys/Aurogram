@@ -609,7 +609,7 @@ export const api = {
   },
   ai: {
     widget: (prompt: string, channelId?: number) =>
-      request<{ html: string; title: string; model: string; chars: number }>("/ai/widget", {
+      request<{ html: string; title: string; model?: string; chars: number; channel_id?: number; buttons?: { text: string; callback_data: string }[] }>("/ai/widget", {
         method: "POST",
         body: json({ prompt, channel_id: channelId ?? null }),
       }),

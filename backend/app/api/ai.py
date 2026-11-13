@@ -140,9 +140,17 @@ async def create_widget(
         ) from exc
     except AiError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    import hashlib
+
+    slug = hashlib.sha1(result["html"].encode("utf-8")).hexdigest()[:16]
     return {
         "html": result["html"],
         "chars": result["chars"],
         "title": payload.prompt.strip()[:60],
         "channel_id": payload.channel_id,
+        # Готовый inline_keyboard для поста: кнопка открывает виджет через бота.
+        "buttons": [
+            {"text": "▶ Открыть виджет", "callback_data": f"widget:{slug}"},
+            {"text": "Другой виджет", "callback_data": "widget:reroll"},
+        ],
     }
