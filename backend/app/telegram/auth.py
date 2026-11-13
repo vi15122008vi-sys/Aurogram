@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any, Optional
 
@@ -16,12 +17,14 @@ from telethon.tl.functions.auth import ResetLoginEmailRequest
 from telethon.tl.functions.account import GetPasswordRequest
 
 from app.config import get_settings
-from app.database import execute, fetchone
+from app.database import execute, fetchone, find_account_by_phone
 from app.deps import encrypt_secret, new_auth_token
 from app.models import Country, ForceMethod
 from app.telegram.client import drop_client, get_client, make_ephemeral_client, resolve_api_credentials
 from app.telegram.floodwait import with_floodwait
 from app.telegram.sessions import delete_session, secure_session_file, session_path
+
+log = logging.getLogger("aurogram.auth")
 
 # Compact but practical country list (ISO + dial + flag). Clients fetch via GET /api/auth/countries.
 COUNTRIES: list[Country] = [
@@ -215,6 +218,17 @@ COUNTRIES: list[Country] = [
 ]
 
 
+async def _ensure_token(account: dict[str, Any]) -> str:
+    """Гарантирует непустой session-токен: иначе клиент останется без авторизации."""
+    token = account.get("token")
+    if isinstance(token, str) and token:
+        return token
+    fresh = new_auth_token()
+    await execute("UPDATE accounts SET token = ? WHERE id = ?", (fresh, account["id"]))
+    account["token"] = fresh
+    return fresh
+
+
 def list_countries() -> list[Country]:
     # Deduplicate by iso keeping first
     seen: set[str] = set()
@@ -260,10 +274,12 @@ async def send_code(
     settings = get_settings()
     reused_existing_account = False
     if account is None:
-        existing = await fetchone("SELECT * FROM accounts WHERE phone = ? AND auth_state = 'ok' ORDER BY created_at LIMIT 1", (phone,))
+        # Ищем аккаунт по номеру в ЛЮБОМ состоянии (ok/pending/dead):
+        # создавать новую запись можно только если такого номера ещё нет.
+        existing = await find_account_by_phone(phone)
         if existing:
-            account = dict(existing)
-            reused_existing_account = True
+            account = existing
+            reused_existing_account = existing.get("auth_state") == "ok"
     account_id = account["id"] if account else str(uuid.uuid4())
     if settings.allow_per_account_keys and api_id and api_hash and not account:
         creds = (api_id, api_hash)
@@ -297,7 +313,8 @@ async def send_code(
             )
         else:
             await execute("UPDATE accounts SET phone = ? WHERE id = ?", (phone, account_id))
-            token = None if reused_existing_account else account["token"]
+            # Переиспользуем существующую сессию: токен мог быть обнулён логаутом.
+            token = await _ensure_token(account)
 
         secure_session_file(session_path(account_id, device_id))
         return {
@@ -351,7 +368,7 @@ async def sign_in(
                 return {
                     "need_password": True,
                     "account_id": account["id"],
-                    "token": account["token"],
+                    "token": await _ensure_token(account),
                 }
             try:
                 me = await with_floodwait(lambda: client.sign_in(password=password))
@@ -396,13 +413,26 @@ async def sign_in(
             """,
             (name or phone, username, phone, account["id"]),
         )
+        # Диагностика: если по этому номеру уже есть другая запись — сообщаем в лог,
+        # чтобы администратор запустил scripts/cleanup_duplicates.py.
+        duplicate = await fetchone(
+            "SELECT id FROM accounts WHERE phone = ? AND id <> ? LIMIT 1",
+            (phone, account["id"]),
+        )
+        if duplicate:
+            log.warning(
+                "accounts: дубликат номера %s (%s и %s) — запустите scripts/cleanup_duplicates.py",
+                phone,
+                account["id"][:8],
+                duplicate["id"][:8],
+            )
         safe_device_id = "".join(c for c in device_id if c.isalnum() or c in "-_")[:80] or "default"
         await execute("INSERT OR IGNORE INTO account_devices (account_id, device_id) VALUES (?, ?)", (account["id"], safe_device_id))
         secure_session_file(session_path(account["id"], device_id))
         return {
             "need_password": False,
             "account_id": account["id"],
-            "token": account["token"],
+            "token": await _ensure_token(account),
             "name": name,
             "username": username,
         }
@@ -473,10 +503,25 @@ async def check_qr(account_id: str) -> dict[str, Any]:
     if not me:
         return {"status": "pending"}
     name = " ".join(filter(None, [getattr(me, "first_name", None), getattr(me, "last_name", None)])).strip()
+    phone = str(getattr(me, "phone", "") or "")
     await execute(
-        "UPDATE accounts SET name = ?, username = ?, auth_state = 'ok', last_sync = datetime('now') WHERE id = ?",
-        (name, getattr(me, "username", None), account_id),
+        """UPDATE accounts
+           SET name = ?, username = ?, phone = COALESCE(NULLIF(?, ''), phone),
+               auth_state = 'ok', last_sync = datetime('now')
+           WHERE id = ?""",
+        (name, getattr(me, "username", None), phone, account_id),
     )
+    if phone:
+        duplicate = await fetchone(
+            "SELECT id FROM accounts WHERE phone = ? AND id <> ? LIMIT 1",
+            (phone, account_id),
+        )
+        if duplicate:
+            log.warning(
+                "accounts: QR-вход создал запись для номера %s, уже существующего как %s — запустите scripts/cleanup_duplicates.py",
+                phone,
+                duplicate["id"][:8],
+            )
     row = await fetchone("SELECT token FROM accounts WHERE id = ?", (account_id,))
     return {"status": "ok", "token": row["token"] if row else None, "name": name}
 

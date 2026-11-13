@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -42,6 +43,11 @@ def _without_token(result: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in result.items() if key != "token"}
 
 
+def _normalize_phone(value: str) -> str:
+    """«+7 999 123-45-67» и «+79991234567» — один и тот же аккаунт."""
+    return re.sub(r"[\s\-()]", "", (value or "").strip())
+
+
 def _auth_payload(result: dict[str, Any]) -> dict[str, Any]:
     """Отдаём токен и в теле ответа.
 
@@ -82,7 +88,7 @@ async def send_code(
     account: dict[str, Any] | None = Depends(get_optional_account),
 ) -> dict[str, Any]:
     result = await telegram_auth.send_code(
-        phone=payload.phone,
+        phone=_normalize_phone(payload.phone),
         force_method=payload.force_method,
         account=account,
         api_id=payload.api_id,
@@ -101,10 +107,11 @@ async def sign_in(
     response: Response,
     account: dict[str, Any] | None = Depends(get_optional_account),
 ) -> dict[str, Any]:
-    if account and account.get("phone") not in {"", payload.phone}:
+    normalized_phone = _normalize_phone(payload.phone)
+    if account and account.get("phone") not in {"", normalized_phone}:
         raise HTTPException(status_code=403, detail="Номер не совпадает с текущей сессией")
     result = await telegram_auth.sign_in(
-        phone=payload.phone,
+        phone=normalized_phone,
         phone_code_hash=payload.phone_code_hash,
         code=payload.code,
         password=payload.password,

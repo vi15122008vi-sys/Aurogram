@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -7,6 +8,8 @@ from typing import Any, Optional
 import aiosqlite
 
 from app.config import get_settings
+
+log = logging.getLogger("aurogram.database")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
@@ -175,9 +178,46 @@ async def init_db() -> None:
             "INSERT OR IGNORE INTO account_devices (account_id, device_id) "
             "SELECT id, 'default' FROM accounts WHERE auth_state = 'ok'"
         )
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_phone ON accounts(phone)")
+        # Уникальность номера включаем только после чистки дублей
+        # (scripts/cleanup_duplicates.py): иначе индекс не создастся и старт упадёт.
+        duplicates = await conn.execute(
+            "SELECT phone, COUNT(*) AS c FROM accounts WHERE phone <> '' GROUP BY phone HAVING c > 1 LIMIT 5"
+        )
+        rows = await duplicates.fetchall()
+        if rows:
+            log.warning(
+                "accounts: найдены дубликаты по phone (%s). Уникальный индекс не создан — "
+                "запустите scripts/cleanup_duplicates.py --apply",
+                ", ".join(f"{row['phone']}×{row['c']}" for row in rows),
+            )
+        else:
+            await conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_phone_unique "
+                "ON accounts(phone) WHERE phone <> ''"
+            )
         await conn.commit()
     finally:
         await conn.close()
+
+
+async def find_account_by_phone(phone: str) -> Optional[dict[str, Any]]:
+    """Канонический аккаунт для номера: сначала авторизованный, затем самый старый.
+
+    Единая точка поиска: любой вход по номеру должен переиспользовать эту запись,
+    иначе появляются дубликаты accounts и новые папки cache_data.
+    """
+    normalized = (phone or "").strip()
+    if not normalized:
+        return None
+    row = await fetchone(
+        """SELECT * FROM accounts
+           WHERE phone = ?
+           ORDER BY (auth_state = 'ok') DESC, created_at ASC
+           LIMIT 1""",
+        (normalized,),
+    )
+    return dict(row) if row else None
 
 
 async def fetchone(sql: str, params: tuple[Any, ...] = ()) -> Optional[aiosqlite.Row]:
