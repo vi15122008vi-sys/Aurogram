@@ -133,23 +133,43 @@ async def summarize_text(text: str, sentences: int = 4) -> dict[str, Any]:
     }
 
 
-def _ask_system() -> str:
-    return (
+TONES = {
+    "strict": "Тон: сухо, по делу, без эмодзи и вступлений.",
+    "friendly": "Тон: дружелюбный, живой, можно одно уместное эмодзи.",
+    "brief": "Тон: максимально кратко, 1–2 предложения.",
+}
+
+
+def _ask_system(translate: bool = False, reply_style: str | None = None) -> str:
+    tone = TONES.get(reply_style or "", "Отвечай кратко (до 6 предложений).")
+    base = (
         "Ты личный ассистент по переписке пользователя в Telegram. "
         "Ниже — последние сообщения из локального кэша в формате «[дата] чат: текст». "
         "Ответь на вопрос пользователя, опираясь ТОЛЬКО на эти сообщения; "
         "если данных не хватает — прямо скажи, что в переписке этого нет. "
-        "Не выдумывай факты. Отвечай кратко (до 6 предложений) на языке вопроса."
+        "Не выдумывай факты. "
+        f"{tone}"
     )
+    if translate:
+        base += " Ответ дай на русском языке; если переписка на другом языке — переведи смысл."
+    else:
+        base += " Язык ответа — язык вопроса."
+    return base
 
 
-async def ask_with_context(question: str, context: str, messages: int = 0) -> dict[str, Any]:
+async def ask_with_context(
+    question: str,
+    context: str,
+    messages: int = 0,
+    translate: bool = False,
+    reply_style: str | None = None,
+) -> dict[str, Any]:
     """Ответ на вопрос по последним сообщениям из кэша."""
     settings = get_settings()
     source = context.strip()[: MAX_INPUT_CHARS * 2]
     answer = await _complete(
         [
-            {"role": "system", "content": _ask_system()},
+            {"role": "system", "content": _ask_system(translate, reply_style)},
             {"role": "user", "content": f"Вопрос: {question.strip()}\n\nПереписка:\n{source}"},
         ],
         temperature=0.2,
@@ -160,4 +180,6 @@ async def ask_with_context(question: str, context: str, messages: int = 0) -> di
         "model": settings.ai_model,
         "context_chars": len(source),
         "context_messages": messages,
+        "translate": translate,
+        "reply_style": reply_style or "brief",
     }

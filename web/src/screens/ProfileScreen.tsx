@@ -119,7 +119,17 @@ export function ProfileScreen({ account, onLogout }: ProfileScreenProps) {
     setAiBusy(true);
     setAiError(null);
     try {
-      setAiAnswer(await api.ai.ask(trimmed));
+      const saved = (() => {
+        try {
+          return JSON.parse(localStorage.getItem("aurogram.ui") || "{}") as { ai_translate?: boolean; ai_reply_style?: string };
+        } catch {
+          return {};
+        }
+      })();
+      setAiAnswer(await api.ai.ask(trimmed, 50, {
+        translate: Boolean(saved.ai_translate),
+        replyStyle: saved.ai_reply_style,
+      }));
     } catch (cause) {
       setAiError(cause instanceof Error ? cause.message : t("AI не ответил"));
     } finally {

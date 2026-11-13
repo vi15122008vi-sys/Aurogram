@@ -352,3 +352,43 @@ html[data-energy="on"] *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* ── Множитель плотности: реально влияет на отступы (Settings → Bento) ── */
+html { --spacing-multiplier: 1; }
+html[data-density="compact"] { --spacing-multiplier: 0.84; }
+html[data-density="spacious"] { --spacing-multiplier: 1.2; }
+.bento { display: grid; gap: calc(0.75rem * var(--spacing-multiplier, 1)); }
+.bento-card { padding: calc(1rem * var(--spacing-multiplier, 1)); }
+
+/* ── Праздничный декор: снежинки (Christmas) ── */
+@keyframes snow-fall {
+  0% { transform: translate3d(0, -10vh, 0) rotate(0deg); opacity: 0; }
+  12% { opacity: 0.9; }
+  100% { transform: translate3d(18px, 108vh, 0) rotate(360deg); opacity: 0; }
+}
+.snowflake {
+  position: fixed;
+  top: -10vh;
+  color: rgb(255 255 255 / 0.9);
+  line-height: 1;
+  pointer-events: none;
+  animation-name: snow-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* ── Праздничный декор: конфетти (New Year) ── */
+@keyframes confetti-pop {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--dx, 0), var(--dy, 120px), 0) rotate(540deg); opacity: 0; }
+}
+.confetti {
+  position: fixed;
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confetti-pop 0.75s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}

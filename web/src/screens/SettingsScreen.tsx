@@ -57,7 +57,7 @@ function BentoCard({
   children: ReactNode;
 }) {
   return (
-    <section className={`glass-panel flex flex-col gap-3 rounded-[26px] p-4 ${className}`}>
+    <section className={`glass-panel bento-card flex flex-col gap-3 rounded-[26px] ${className}`}>
       <div className="flex items-start gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-accent/10 text-accent">{icon}</span>
         <div className="min-w-0">
@@ -179,7 +179,7 @@ export function SettingsScreen({ accountName, phone, onLogout }: SettingsProps) 
       <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("PREFERENCES")}</p>
       <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.02em] text-ink">{t("Настройки")}</h1>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="bento mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <BentoCard
           className="sm:col-span-2 lg:col-span-3"
           title={t("Аккаунт")}

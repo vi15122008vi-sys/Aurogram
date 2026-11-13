@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -20,6 +20,8 @@ MIN_TEXT_CHARS = 40
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=500)
     limit: int = Field(default=50, ge=10, le=200)
+    translate: bool = False
+    reply_style: Literal["strict", "friendly", "brief"] | None = None
 
 
 class SummarizeRequest(BaseModel):
@@ -102,7 +104,13 @@ async def ask(
             detail="В кэше пока нет сообщений — откройте чаты, чтобы они загрузились",
         )
     try:
-        return await ask_with_context(payload.question, context, messages=count)
+        return await ask_with_context(
+            payload.question,
+            context,
+            messages=count,
+            translate=payload.translate,
+            reply_style=payload.reply_style,
+        )
     except AiNotConfigured as exc:
         raise HTTPException(
             status_code=503,

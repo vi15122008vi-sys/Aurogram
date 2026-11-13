@@ -246,6 +246,8 @@ export interface AiAnswer {
   model: string;
   context_chars: number;
   context_messages: number;
+  translate?: boolean;
+  reply_style?: string;
 }
 
 export interface ChannelIntegrations {
@@ -555,8 +557,11 @@ export const api = {
     exportData: () => download("/profile/export"),
   },
   ai: {
-    ask: (question: string, limit = 50) =>
-      request<AiAnswer>("/ai/ask", { method: "POST", body: json({ question, limit }) }),
+    ask: (question: string, limit = 50, options: { translate?: boolean; replyStyle?: string } = {}) =>
+      request<AiAnswer>("/ai/ask", {
+        method: "POST",
+        body: json({ question, limit, translate: Boolean(options.translate), reply_style: options.replyStyle ?? null }),
+      }),
     summarize: (payload: { text?: string; chat_id?: number; message_id?: number; sentences?: number }) =>
       request<AiSummary>("/ai/summarize", { method: "POST", body: json(payload) }),
   },

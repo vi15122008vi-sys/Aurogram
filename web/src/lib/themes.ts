@@ -1,4 +1,4 @@
-export type ThemeId = "aurogram" | "paper" | "mint" | "sky" | "sand" | "sakura" | "ice" | "ghost" | "midnight" | "ocean" | "sunset" | "orange" | "halloween";
+export type ThemeId = "aurogram" | "paper" | "mint" | "sky" | "sand" | "sakura" | "ice" | "ghost" | "midnight" | "ocean" | "sunset" | "orange" | "halloween" | "christmas" | "newyear";
 
 /** Семантические цвета темы. Каждое значение уходит в CSS-переменную через {@link applyTheme}. */
 export interface ThemeColors {
@@ -41,10 +41,12 @@ export interface AurogramTheme {
   dark: boolean;
   colors: ThemeColors;
   glass: ThemeGlass;
+  /** Праздничный декор поверх интерфейса (снежинки/конфетти). */
+  decor?: "snow" | "confetti";
 }
 
 /**
- * Тринадцать визуально различимых тем: у каждой свой фон, свои карточки
+ * Пятнадцать визуально различимых тем: у каждой свой фон, свои карточки
  * и свой акцент. Контраст ink/canvas ≥ 14:1, акцент-текста ≥ 3:1,
  * текста на акцентной кнопке ≥ 3.7:1.
  */
@@ -54,8 +56,8 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     name: "Aurogram Dark",
     dark: true,
     colors: {
-      canvas: "#0A0A0C", surface: "#111114", raised: "#191920", ink: "#FAFAFA", muted: "#A1A1AA",
-      line: "rgba(255,255,255,0.032)", accent: "#6366F1", accentStrong: "#818CF8", success: "#22C55E",
+      canvas: "#121212", surface: "#1A1A1F", raised: "#242430", ink: "#F7F7FA", muted: "#B0B0BC",
+      line: "rgba(255,255,255,0.032)", accent: "#7C7FF5", accentStrong: "#A5B4FC", success: "#34D399",
       warning: "#F59E0B", danger: "#EF4444", ghost: "#A78BFA",
     },
     glass: {
@@ -97,7 +99,7 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     dark: false,
     colors: {
       canvas: "#ECF4FB", surface: "#FFFFFF", raised: "#DEEBF7", ink: "#0F1E2B", muted: "#557086",
-      line: "rgba(15,30,43,0.04)", accent: "#0284C7", accentStrong: "#0369A1", success: "#15803D",
+      line: "rgba(15,30,43,0.04)", accent: "#0369A1", accentStrong: "#075985", success: "#15803D",
       warning: "#B45309", danger: "#B91C1C", ghost: "#6D5BD0",
     },
     glass: {
@@ -125,7 +127,7 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     dark: false,
     colors: {
       canvas: "#FFF0F5", surface: "#FFFFFF", raised: "#FAD4E2", ink: "#1A1A1A", muted: "#7A4459",
-      line: "rgba(26,26,26,0.07)", accent: "#E91E63", accentStrong: "#C2185B", success: "#15803D",
+      line: "rgba(26,26,26,0.07)", accent: "#C2185B", accentStrong: "#AD1457", success: "#15803D",
       warning: "#B45309", danger: "#B91C1C", ghost: "#9D174D",
     },
     glass: {
@@ -139,7 +141,7 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     dark: false,
     colors: {
       canvas: "#E0F2FE", surface: "#FFFFFF", raised: "#CBE7F9", ink: "#0F172A", muted: "#4A6076",
-      line: "rgba(15,23,42,0.07)", accent: "#0284C7", accentStrong: "#0369A1", success: "#15803D",
+      line: "rgba(15,23,42,0.07)", accent: "#0369A1", accentStrong: "#075985", success: "#15803D",
       warning: "#B45309", danger: "#B91C1C", ghost: "#4F46E5",
     },
     glass: {
@@ -152,8 +154,8 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     name: "Ghost",
     dark: true,
     colors: {
-      canvas: "#101322", surface: "#171B2E", raised: "#202640", ink: "#F7F7FF", muted: "#A8ABC2",
-      line: "rgba(255,255,255,0.036)", accent: "#8B5CF6", accentStrong: "#A78BFA", success: "#22C55E",
+      canvas: "#161A2C", surface: "#1F2440", raised: "#2A3150", ink: "#F8F8FF", muted: "#B3B8D2",
+      line: "rgba(255,255,255,0.036)", accent: "#A78BFA", accentStrong: "#C4B5FD", success: "#34D399",
       warning: "#F59E0B", danger: "#EF4444", ghost: "#C4B5FD",
     },
     glass: {
@@ -166,7 +168,7 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     name: "Midnight",
     dark: true,
     colors: {
-      canvas: "#06080F", surface: "#0C111C", raised: "#141B2A", ink: "#F3F6FB", muted: "#94A0B6",
+      canvas: "#10141F", surface: "#161C2B", raised: "#1F2740", ink: "#F5F8FD", muted: "#A6B2C8",
       line: "rgba(255,255,255,0.034)", accent: "#EAB308", accentStrong: "#FACC15", success: "#22C55E",
       warning: "#FDE047", danger: "#EF4444", ghost: "#A78BFA",
     },
@@ -180,7 +182,7 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     name: "Ocean",
     dark: true,
     colors: {
-      canvas: "#04121A", surface: "#0A1E29", raised: "#112D3B", ink: "#E9F9FF", muted: "#8CAEBD",
+      canvas: "#0B1B26", surface: "#142A38", raised: "#1C3A4A", ink: "#ECFBFF", muted: "#A2C2D2",
       line: "rgba(255,255,255,0.036)", accent: "#0891B2", accentStrong: "#06B6D4", success: "#22C55E",
       warning: "#F59E0B", danger: "#EF4444", ghost: "#A78BFA",
     },
@@ -194,8 +196,8 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     name: "Sunset",
     dark: true,
     colors: {
-      canvas: "#140710", surface: "#1F0C18", raised: "#2C1222", ink: "#FFF4F8", muted: "#C3A2B0",
-      line: "rgba(255,255,255,0.036)", accent: "#E11D48", accentStrong: "#FB7185", success: "#22C55E",
+      canvas: "#1B1018", surface: "#2A1522", raised: "#3A1B2C", ink: "#FFF5F9", muted: "#D2B2C0",
+      line: "rgba(255,255,255,0.036)", accent: "#FB7185", accentStrong: "#FDA4AF", success: "#22C55E",
       warning: "#FBBF24", danger: "#EF4444", ghost: "#C4B5FD",
     },
     glass: {
@@ -208,7 +210,7 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     name: "Orange",
     dark: true,
     colors: {
-      canvas: "#1A0E05", surface: "#261607", raised: "#341E0C", ink: "#FFF6EC", muted: "#C9A98C",
+      canvas: "#1F1409", surface: "#31200D", raised: "#422913", ink: "#FFF8F0", muted: "#D8BCA0",
       line: "rgba(255,255,255,0.038)", accent: "#F97316", accentStrong: "#FB923C", success: "#22C55E",
       warning: "#FBBF24", danger: "#EF4444", ghost: "#C084FC",
     },
@@ -222,13 +224,43 @@ export const aurogramThemes: Record<ThemeId, AurogramTheme> = {
     name: "Halloween",
     dark: true,
     colors: {
-      canvas: "#150B22", surface: "#1F1030", raised: "#2C1642", ink: "#FBF5FF", muted: "#B9A5CB",
-      line: "rgba(255,255,255,0.038)", accent: "#C026D3", accentStrong: "#D946EF", success: "#4ADE80",
-      warning: "#FDE047", danger: "#EF4444", ghost: "#FB923C",
+      canvas: "#0C0A14", surface: "#171126", raised: "#221736", ink: "#FCF8FF", muted: "#CDBCDD",
+      line: "rgba(255,255,255,0.040)", accent: "#FF7F50", accentStrong: "#FF9E7A", success: "#4ADE80",
+      warning: "#FDE047", danger: "#FF5C5C", ghost: "#8A2BE2",
     },
     glass: {
-      border: "rgba(255,255,255,0.036)", fill: "rgba(192,38,211,0.09)",
-      highlight: "rgba(255,255,255,0.10)", glow: "rgb(251 146 60 / 16%)", blur: "32px", onAccent: "#FFFFFF",
+      border: "rgba(255,127,80,0.12)", fill: "rgba(255,127,80,0.09)",
+      highlight: "rgba(255,255,255,0.10)", glow: "rgb(138 43 226 / 22%)", blur: "32px", onAccent: "#14060D",
+    },
+  },
+  christmas: {
+    id: "christmas",
+    name: "Christmas",
+    dark: true,
+    decor: "snow",
+    colors: {
+      canvas: "#0F1F15", surface: "#16291D", raised: "#1F3A28", ink: "#F2FFF7", muted: "#A9C9B6",
+      line: "rgba(255,255,255,0.040)", accent: "#FF5A65", accentStrong: "#FF7A83", success: "#34D399",
+      warning: "#FFD700", danger: "#FF6B6B", ghost: "#FFD700",
+    },
+    glass: {
+      border: "rgba(230,57,70,0.14)", fill: "rgba(230,57,70,0.08)",
+      highlight: "rgba(255,255,255,0.10)", glow: "rgb(230 57 70 / 20%)", blur: "26px", onAccent: "#FFFFFF",
+    },
+  },
+  newyear: {
+    id: "newyear",
+    name: "New Year",
+    dark: true,
+    decor: "confetti",
+    colors: {
+      canvas: "#0A192F", surface: "#11243F", raised: "#1A3151", ink: "#F5FAFF", muted: "#9FB3CE",
+      line: "rgba(255,255,255,0.045)", accent: "#FFD700", accentStrong: "#FFE44D", success: "#34D399",
+      warning: "#FBBF24", danger: "#FF7B72", ghost: "#C0C0C0",
+    },
+    glass: {
+      border: "rgba(255,215,0,0.14)", fill: "rgba(255,215,0,0.07)",
+      highlight: "rgba(255,255,255,0.12)", glow: "rgb(255 215 0 / 20%)", blur: "28px", onAccent: "#0A192F",
     },
   },
 };
@@ -292,9 +324,10 @@ export function applyTheme(themeId: ThemeId): void {
   root.style.setProperty("--glass-highlight", theme.glass.highlight);
   root.style.setProperty("--glass-blur", theme.glass.blur);
   root.style.setProperty("--theme-glow", theme.glass.glow);
+  root.dataset.theme = theme.id;
+  window.dispatchEvent(new CustomEvent("aurogram:theme", { detail: theme.id }));
   root.style.setProperty("--on-accent", theme.glass.onAccent);
   root.style.setProperty("color-scheme", theme.dark ? "dark" : "light");
-  root.dataset.theme = theme.id;
 
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme.colors.canvas);
 }
