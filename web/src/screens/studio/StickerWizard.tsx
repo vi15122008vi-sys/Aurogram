@@ -20,7 +20,7 @@ export function StickerWizard({ channelId }: StickerWizardProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [removeBg, setRemoveBg] = useState(true);
   const [title, setTitle] = useState("Aurogram stickers");
@@ -39,7 +39,7 @@ export function StickerWizard({ channelId }: StickerWizardProps) {
 
   function reset() {
     setStep(1);
-    setFile(null);
+    setFiles([]);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setRemoveBg(true);
@@ -61,24 +61,29 @@ export function StickerWizard({ channelId }: StickerWizardProps) {
     }
   }
 
-  function acceptFile(next: File | null | undefined) {
-    if (!next || !next.type.startsWith("image/")) {
+  function acceptFiles(next: FileList | null | undefined) {
+    const picked = Array.from(next ?? []).filter((item) => item.type.startsWith("image/"));
+    if (!picked.length) {
       setError(t("Нужно изображение: JPEG или PNG", "An image is required: JPEG or PNG"));
       return;
     }
+    if (picked.length > 50) {
+      setError(t("Не больше 50 стикеров в паке", "Up to 50 stickers per pack"));
+      return;
+    }
     setError(null);
-    setFile(next);
+    setFiles(picked);
     if (preview) URL.revokeObjectURL(preview);
-    setPreview(URL.createObjectURL(next));
+    setPreview(URL.createObjectURL(picked[0]));
     setStep(2);
   }
 
   async function publish() {
-    if (!file) return;
+    if (!files.length) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await api.stickers.create(file, { title: title.trim() || "Aurogram stickers", removeBg });
+      const result = await api.stickers.create(files, { title: title.trim() || "Aurogram stickers", removeBg });
       setCreated({ name: result.name, link: result.link, removedBackground: result.removed_background });
       setStep(3);
     } catch (cause) {
@@ -153,13 +158,13 @@ export function StickerWizard({ channelId }: StickerWizardProps) {
                     onDrop={(event) => {
                       event.preventDefault();
                       setDragging(false);
-                      acceptFile(event.dataTransfer.files?.[0]);
+                      acceptFiles(event.dataTransfer.files);
                     }}
                     className={`grid place-items-center gap-2 rounded-[20px] border border-dashed p-8 text-center transition ${dragging ? "border-accent bg-accent/10" : "border-[color-mix(in_srgb,var(--ink)_14%,transparent)] bg-surface/40"}`}
                   >
                     <ImagePlus size={26} className="text-accent" />
                     <p className="text-sm font-medium text-ink">{t("Перетащите фото сюда")}</p>
-                    <p className="text-[11px] text-muted">{t("JPEG или PNG, до 8 МБ", "JPEG or PNG, up to 8 MB")}</p>
+                    <p className="text-[11px] text-muted">{t("JPEG или PNG, до 8 МБ · можно выбрать несколько", "JPEG or PNG, up to 8 MB · multiple allowed")}</p>
                     <button type="button" onClick={() => inputRef.current?.click()} className="mt-1 inline-flex h-9 items-center rounded-full bg-surface/70 px-3.5 text-[11px] font-medium text-ink transition hover:text-accent">
                       {t("Выбрать файл")}
                     </button>
@@ -167,8 +172,9 @@ export function StickerWizard({ channelId }: StickerWizardProps) {
                       ref={inputRef}
                       type="file"
                       accept="image/*"
+                      multiple
                       className="hidden"
-                      onChange={(event) => acceptFile(event.target.files?.[0])}
+                      onChange={(event) => acceptFiles(event.target.files)}
                     />
                   </div>
                   <p className="mt-3 text-[10px] leading-4 text-muted">
@@ -183,6 +189,9 @@ export function StickerWizard({ channelId }: StickerWizardProps) {
                 <div className="mt-4 grid gap-3">
                   <div className="grid place-items-center rounded-[20px] bg-[repeating-conic-gradient(from_0deg,rgba(255,255,255,0.06)_0deg_90deg,rgba(0,0,0,0.12)_90deg_180deg)] bg-[length:18px_18px] p-3">
                     {preview && <img src={preview} alt="" className="max-h-56 rounded-[14px] object-contain" />}
+                    {files.length > 1 && (
+                      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{files.length} {t("стикеров в паке", "stickers in pack")}</p>
+                    )}
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-1.5 text-xs text-ink"><Scissors size={13} className="text-accent" />{t("Удалить фон (rembg)")}</span>
@@ -237,7 +246,7 @@ export function StickerWizard({ channelId }: StickerWizardProps) {
                   <button
                     type="button"
                     onClick={() => void publish()}
-                    disabled={busy || !file}
+                    disabled={busy || !files.length}
                     className="inline-flex h-10 items-center gap-1.5 rounded-[14px] bg-accent px-4 text-xs font-semibold text-white transition hover:bg-accent-strong disabled:opacity-50"
                   >
                     {busy ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}

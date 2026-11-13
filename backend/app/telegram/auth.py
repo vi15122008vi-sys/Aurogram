@@ -408,10 +408,11 @@ async def sign_in(
         await execute(
             """
             UPDATE accounts
-            SET name = ?, username = ?, auth_state = 'ok', phone = ?, last_sync = datetime('now')
+            SET name = ?, username = ?, auth_state = 'ok', phone = ?,
+                tg_user_id = COALESCE(?, tg_user_id), last_sync = datetime('now')
             WHERE id = ?
             """,
-            (name or phone, username, phone, account["id"]),
+            (name or phone, username, phone, getattr(me, "id", None), account["id"]),
         )
         # Диагностика: если по этому номеру уже есть другая запись — сообщаем в лог,
         # чтобы администратор запустил scripts/cleanup_duplicates.py.
@@ -507,9 +508,9 @@ async def check_qr(account_id: str) -> dict[str, Any]:
     await execute(
         """UPDATE accounts
            SET name = ?, username = ?, phone = COALESCE(NULLIF(?, ''), phone),
-               auth_state = 'ok', last_sync = datetime('now')
+               tg_user_id = COALESCE(?, tg_user_id), auth_state = 'ok', last_sync = datetime('now')
            WHERE id = ?""",
-        (name, getattr(me, "username", None), phone, account_id),
+        (name, getattr(me, "username", None), phone, getattr(me, "id", None), account_id),
     )
     if phone:
         duplicate = await fetchone(

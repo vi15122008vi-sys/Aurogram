@@ -183,3 +183,38 @@ async def ask_with_context(
         "translate": translate,
         "reply_style": reply_style or "brief",
     }
+
+
+WIDGET_SYSTEM = (
+    "Ты frontend-разработчик Telegram-виджетов. Верни ТОЛЬКО HTML-документ "
+    "(<!doctype html>…</html>) без пояснений и без markdown-обёрток. "
+    "Требования: инлайн CSS и JS внутри документа, никаких внешних ресурсов "
+    "(без <script src>, <link href>, шрифтов и картинок по URL); "
+    "адаптивная вёрстка под ширину 320–600px; тёмная тема; скругления и "
+    "полупрозрачный фон в стиле Liquid Glass; интерактивность обязательна."
+)
+
+
+async def generate_widget(prompt: str) -> dict[str, Any]:
+    """Промпт → автономный HTML-виджет (опрос, игра, таймер…)."""
+    settings = get_settings()
+    html = await _complete(
+        [
+            {"role": "system", "content": WIDGET_SYSTEM},
+            {"role": "user", "content": prompt.strip()[:2000]},
+        ],
+        temperature=0.4,
+        max_tokens=2400,
+    )
+    html = html.strip()
+    if html.startswith("```"):
+        html = html.strip("`")
+        if html.lower().startswith("html"):
+            html = html[4:].lstrip()
+    if "<html" not in html.lower():
+        html = (
+            "<!doctype html><html lang=\"ru\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+            f"<style>body{{margin:0;font-family:system-ui;background:#0b0b0f;color:#f5f5f7}}</style></head><body>{html}</body></html>"
+        )
+    return {"html": html[:20000], "chars": len(html[:20000])}

@@ -5,7 +5,7 @@ from typing import Any, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.ai import AiError, AiNotConfigured, ask_with_context, summarize_text
+from app.ai import AiError, AiNotConfigured, ask_with_context, generate_widget, summarize_text
 from app.cache.manager import connect_cache
 from app.deps import get_current_account
 from app.ratelimit import AI_LIMITER, limit_requests
@@ -15,6 +15,11 @@ from app.telegram.floodwait import with_floodwait
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 MIN_TEXT_CHARS = 40
+
+
+class WidgetRequest(BaseModel):
+    prompt: str = Field(min_length=5, max_length=500)
+    channel_id: Optional[int] = None
 
 
 class AskRequest(BaseModel):
@@ -118,3 +123,26 @@ async def ask(
         ) from exc
     except AiError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/widget", dependencies=[Depends(limit_requests(AI_LIMITER, "ai.widget"))])
+async def create_widget(
+    payload: WidgetRequest,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> dict[str, Any]:
+    """Промпт → готовый HTML-виджет (опрос/игра/таймер) для канала."""
+    try:
+        result = await generate_widget(payload.prompt)
+    except AiNotConfigured as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI-генератор не настроен: задайте DEEPSEEK_API_KEY в окружении бэкенда",
+        ) from exc
+    except AiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "html": result["html"],
+        "chars": result["chars"],
+        "title": payload.prompt.strip()[:60],
+        "channel_id": payload.channel_id,
+    }

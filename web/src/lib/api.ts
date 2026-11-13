@@ -540,9 +540,9 @@ export const api = {
     },
   },
   stickers: {
-    create: (file: File, options: { title?: string; removeBg?: boolean; emoji?: string } = {}) => {
+    create: (input: File | File[], options: { title?: string; removeBg?: boolean; emoji?: string } = {}) => {
       const form = new FormData();
-      form.append("file", file);
+      for (const file of Array.isArray(input) ? input : [input]) form.append("files", file);
       form.append("title", options.title ?? "Aurogram sticker");
       form.append("remove_bg", String(options.removeBg ?? true));
       form.append("emoji", options.emoji ?? "⭐");
@@ -576,6 +576,11 @@ export const api = {
     exportData: () => download("/profile/export"),
   },
   ai: {
+    widget: (prompt: string, channelId?: number) =>
+      request<{ html: string; title: string; model: string; chars: number }>("/ai/widget", {
+        method: "POST",
+        body: json({ prompt, channel_id: channelId ?? null }),
+      }),
     ask: (question: string, limit = 50, options: { translate?: boolean; replyStyle?: string } = {}) =>
       request<AiAnswer>("/ai/ask", {
         method: "POST",

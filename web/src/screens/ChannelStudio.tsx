@@ -8,6 +8,7 @@ import { escapeHtml, studioWidgets, widgetAccents, widgetCategories, widgetPost,
 import { MediaLibrary } from "./studio/MediaLibrary";
 import { ScheduledPosts } from "./studio/ScheduledPosts";
 import { StickerStudio } from "./studio/StickerStudio";
+import { AiWidgetStudio } from "./studio/AiWidgetStudio";
 import { StickerWizard } from "./studio/StickerWizard";
 
 type StudioSection = "widgets" | "stickers" | "media" | "scheduled";
@@ -131,6 +132,8 @@ export function ChannelStudio({ channelId, channelTitle, initialSection = "widge
       </div>
 
       {section === "widgets" ? (
+        <div className="grid gap-3">
+        <AiWidgetStudio channelId={channelId} />
         <div className="glass-panel rounded-[26px] p-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex flex-wrap gap-1" role="tablist" aria-label={t("Категории виджетов", "Widget categories")}>
@@ -171,6 +174,7 @@ export function ChannelStudio({ channelId, channelTitle, initialSection = "widge
             ))}
             {!visible.length && <p className="col-span-full py-8 text-center text-xs text-muted">{t("Ничего не найдено", "Nothing found")}</p>}
           </div>
+        </div>
         </div>
       ) : section === "stickers" ? (
         <div className="grid gap-3">

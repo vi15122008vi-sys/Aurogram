@@ -23,6 +23,22 @@ STICKER_SIDE = 512
 MAX_BYTES = 512 * 1024
 
 
+# u2netp — лёгкая модель (~4 МБ вместо ~170 МБ у u2net):
+# образ не раздувается, фон режется чуть грубее, но для стикеров этого достаточно.
+REMBG_MODEL = "u2netp"
+_session: Any = None
+
+
+def _session_instance() -> Any:
+    """Ленивая сессия rembg с моделью u2netp (скачивается один раз)."""
+    global _session
+    if _session is None:
+        from rembg import new_session  # noqa: PLC0415
+
+        _session = new_session(REMBG_MODEL)
+    return _session
+
+
 def _has_rembg() -> bool:
     try:
         import rembg  # noqa: F401
@@ -32,11 +48,11 @@ def _has_rembg() -> bool:
 
 
 def remove_background(data: bytes) -> bytes:
-    """Удаляет фон через rembg. При отсутствии библиотеки возвращает исходник."""
+    """Удаляет фон через rembg(u2netp). При отсутствии библиотеки возвращает исходник."""
     try:
         from rembg import remove  # noqa: PLC0415
 
-        return remove(data)
+        return remove(data, session=_session_instance())
     except Exception as exc:  # модель не скачана / нет памяти
         log.warning("rembg недоступен: %s", exc)
         return data
@@ -115,6 +131,42 @@ async def publish_pack(
     except BotError as exc:
         log.warning("sticker notify failed: %s", exc)
     return {"name": name, "link": link, "count": len(stickers), "notified": notified, "raw": result}
+
+
+async def create_multi_sticker(
+    *,
+    owner_id: int,
+    title: str,
+    photos: list[bytes],
+    cut_background: bool = True,
+    emoji: str = "⭐",
+) -> dict[str, Any]:
+    """Список фото → один стикерпак с несколькими стикерами (+ личка со ссылкой)."""
+    settings = get_settings()
+    if not settings.bot_token:
+        raise BotError("BOT_TOKEN не задан — создание стикеров недоступно")
+    if not photos:
+        raise BotError("Нужен хотя бы один файл")
+    if len(photos) > 50:
+        raise BotError("Не больше 50 стикеров в паке")
+
+    prepared: list[bytes] = []
+    removed_any = False
+    for photo in photos:
+        sticker, removed = prepare_sticker(photo, cut_background=cut_background)
+        prepared.append(sticker)
+        removed_any = removed_any or removed
+
+    pack = await publish_pack(owner_id=owner_id, title=title, stickers=prepared, emoji=emoji)
+    return {
+        "status": "ok",
+        "name": pack["name"],
+        "link": pack["link"],
+        "count": pack["count"],
+        "removed_background": removed_any,
+        "notified": pack["notified"],
+        "size_bytes": sum(len(item) for item in prepared),
+    }
 
 
 async def create_single_sticker(

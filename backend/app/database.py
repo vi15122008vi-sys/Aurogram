@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     api_id_enc TEXT,
     api_hash_enc TEXT,
     token TEXT UNIQUE,
+    tg_user_id INTEGER,
     created_at TEXT DEFAULT (datetime('now')),
     last_sync TEXT,
     meta_json TEXT DEFAULT '{}'
@@ -206,6 +207,10 @@ async def init_db() -> None:
         # Старые базы не знают про настройки внешнего вида/AI — добавляем колонки на лету.
         prefs_cursor = await conn.execute("PRAGMA table_info(account_preferences)")
         pref_columns = {row["name"] for row in await prefs_cursor.fetchall()}
+        accounts_cursor = await conn.execute("PRAGMA table_info(accounts)")
+        account_columns = {row["name"] for row in await accounts_cursor.fetchall()}
+        if "tg_user_id" not in account_columns:
+            await conn.execute("ALTER TABLE accounts ADD COLUMN tg_user_id INTEGER")
         for column, ddl in {
             "density": "TEXT DEFAULT 'comfortable'",
             "card_style": "TEXT DEFAULT 'glass'",
