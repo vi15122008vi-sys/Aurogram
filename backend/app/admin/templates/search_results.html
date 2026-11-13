@@ -1,8 +1,22 @@
 {% if not q or q|length < 2 %}
-<p class="p-6 text-center text-sm text-zinc-500">Введите минимум два символа — ищем по кэшу чатов и сообщений.</p>
-{% elif not chats and not messages %}
+<p class="p-6 text-center text-sm text-zinc-500">Введите минимум два символа — ищем по аккаунтам, чатам и сообщениям.</p>
+{% elif not chats and not messages and not accounts %}
 <p class="p-6 text-center text-sm text-zinc-500">Ничего не найдено по запросу «{{ q }}»</p>
 {% else %}
+  {% if accounts %}
+  <p class="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Аккаунты · {{ accounts|length }}</p>
+  {% for row in accounts %}
+  <a href="/admin/chats?account_id={{ row.account_id|urlencode }}" class="flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition hover:bg-white/[0.06]">
+    <span class="grid size-8 shrink-0 place-items-center rounded-full bg-indigo-500/10 text-[11px] font-semibold text-indigo-200">{{ (row.name or row.phone or '?')|first|upper }}</span>
+    <span class="min-w-0 flex-1">
+      <span class="block truncate text-sm text-zinc-100">{{ row.name or 'Без имени' }}{% if row.phone %} · {{ row.phone }}{% endif %}</span>
+      <span class="block truncate font-mono text-[11px] text-zinc-500">{{ row.account_id }}</span>
+    </span>
+    <svg viewBox="0 0 24 24" class="size-4 shrink-0 text-zinc-600" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  </a>
+  {% endfor %}
+  {% endif %}
+
   {% if chats %}
   <p class="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Чаты · {{ chats|length }}</p>
   {% for row in chats %}

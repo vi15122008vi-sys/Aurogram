@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -19,6 +19,7 @@ from app.cache.index import get_listener_heartbeat
 from app.cache.stats import global_stats, growth_30d
 from app.config import get_settings
 from app.database import fetchall
+from app.ratelimit import ADMIN_LOGIN_LIMITER, limit_requests
 from app.telegram.chats import fetch_chat_history
 from app.telegram.media import download_message_media, resolve_media_file
 
@@ -151,14 +152,32 @@ async def _dashboard_cards() -> dict[str, Any]:
     }
 
 
-async def _search_cached(needle: str, per_account: int = 6) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Глобальный поиск по кэшу: чаты и сообщения (регистронезависимо, вкл. кириллицу)."""
+async def _search_cached(
+    needle: str,
+    per_account: int = 6,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Глобальный поиск: аккаунты (по id/имени/телефону), чаты и сообщения.
+
+    Сообщения ищем гибридно: SQL `LIKE` (быстро, регистронезависимо для ASCII
+    и точно для кириллицы) + добор по свежим строкам в Python, чтобы находить
+    кириллицу в другом регистре.
+    """
     term = needle.strip().lower()
     chats: list[dict[str, Any]] = []
     messages: list[dict[str, Any]] = []
+    account_hits: list[dict[str, Any]] = []
     if len(term) < 2:
-        return chats, messages
-    accounts = await fetchall("SELECT id, name FROM accounts")
+        return chats, messages, account_hits
+
+    accounts = await fetchall("SELECT id, name, phone FROM accounts")
+    for account in accounts:
+        haystack = f"{account['id']} {account['name'] or ''} {account['phone'] or ''}".lower()
+        if term in haystack:
+            account_hits.append(
+                {"account_id": account["id"], "name": account["name"], "phone": account["phone"]}
+            )
+
+    chat_limit = per_account * max(1, len(accounts))
     for account in accounts:
         try:
             conn = await connect_cache(account["id"])
@@ -170,19 +189,32 @@ async def _search_cached(needle: str, per_account: int = 6) -> tuple[list[dict[s
                 haystack = f"{row['title'] or ''} {row['username'] or ''}".lower()
                 if term in haystack:
                     chats.append({**dict(row), "account_id": account["id"], "account_name": account["name"]})
-                    if len(chats) >= per_account * len(accounts):
+                    if len(chats) >= chat_limit:
                         break
 
+            candidates: list[dict[str, Any]] = []
             cursor = await conn.execute(
                 "SELECT chat_id, id, text, date, media_type FROM cached_messages "
-                "WHERE text IS NOT NULL ORDER BY date DESC LIMIT 1500"
+                "WHERE text LIKE ? ORDER BY date DESC LIMIT ?",
+                (f"%{term}%", per_account * 4),
             )
-            found = 0
-            for row in await cursor.fetchall():
+            candidates.extend(dict(row) for row in await cursor.fetchall())
+            if len(candidates) < per_account:
+                cursor = await conn.execute(
+                    "SELECT chat_id, id, text, date, media_type FROM cached_messages "
+                    "WHERE text IS NOT NULL ORDER BY date DESC LIMIT 1500"
+                )
+                candidates.extend(dict(row) for row in await cursor.fetchall())
+
+            seen: set[tuple[int, int]] = set()
+            for row in candidates:
+                key = (int(row["chat_id"]), int(row["id"]))
+                if key in seen:
+                    continue
                 if term in (row["text"] or "").lower():
-                    messages.append({**dict(row), "account_id": account["id"], "account_name": account["name"]})
-                    found += 1
-                    if found >= per_account:
+                    seen.add(key)
+                    messages.append({**row, "account_id": account["id"], "account_name": account["name"]})
+                    if len(messages) >= chat_limit:
                         break
         except Exception:
             continue
@@ -190,7 +222,7 @@ async def _search_cached(needle: str, per_account: int = 6) -> tuple[list[dict[s
             await conn.close()
     chats.sort(key=lambda item: (item.get("type") or "", item.get("title") or ""))
     messages.sort(key=lambda item: item.get("date") or "", reverse=True)
-    return chats, messages
+    return chats, messages, account_hits
 
 
 def _csv_response(rows: list[dict[str, Any]], fields: list[str], filename: str) -> Response:
@@ -654,7 +686,11 @@ async def login_page(request: Request) -> Response:
     return templates.TemplateResponse(request=request, name="login.html", context={"request": request, "error": None})
 
 
-@router.post("/login", response_class=HTMLResponse)
+@router.post(
+    "/login",
+    response_class=HTMLResponse,
+    dependencies=[Depends(limit_requests(ADMIN_LOGIN_LIMITER, "admin.login"))],
+)
 async def login(
     request: Request,
     username: str = Form(..., max_length=128),
@@ -710,14 +746,14 @@ async def export_messages_csv(request: Request) -> Response:
 
 @router.get("/search", response_class=HTMLResponse)
 async def admin_search(request: Request, q: str = Query(default="", max_length=120)) -> Response:
-    """Фрагмент для палитры ⌘K: чаты и сообщения из кэша."""
+    """Фрагмент для палитры ⌘K: аккаунты (id/имя/телефон), чаты и сообщения."""
     if not _admin_session(request):
         return HTMLResponse("", status_code=401)
-    chats, messages = await _search_cached(q)
+    chats, messages, accounts = await _search_cached(q)
     return templates.TemplateResponse(
         request=request,
         name="search_results.html",
-        context={"request": request, "q": q, "chats": chats, "messages": messages},
+        context={"request": request, "q": q, "chats": chats, "messages": messages, "accounts": accounts},
     )
 
 

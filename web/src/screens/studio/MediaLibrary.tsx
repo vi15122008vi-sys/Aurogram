@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Film, Image as ImageIcon, LoaderCircle, RefreshCw } from "lucide-react";
-import { api, messageMediaUrl, type MessageRecord } from "../../lib/api";
+import { api, messageMediaUrl, messageThumbUrl, type MessageRecord } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 
 type MediaFilter = "all" | "photo" | "video" | "other";
@@ -88,11 +88,11 @@ export function MediaLibrary({ channelId }: { channelId: number }) {
                 rel="noreferrer"
                 className="group relative aspect-square overflow-hidden rounded-[18px] bg-surface/50 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_5%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_25%,transparent),0_12px_28px_color-mix(in_srgb,var(--accent)_16%,transparent)]"
               >
-                {isPhoto ? (
-                  <img src={url} alt={item.text ?? t("Фото", "Photo")} loading="lazy" className="size-full object-cover" />
+                {isPhoto || isVideo ? (
+                  <MediaThumb chatId={channelId} messageId={item.id} video={isVideo} label={item.text ?? undefined} />
                 ) : (
                   <span className="grid size-full place-items-center text-muted">
-                    {isVideo ? <Film size={22} strokeWidth={1.5} /> : <ImageIcon size={22} strokeWidth={1.5} />}
+                    <ImageIcon size={22} strokeWidth={1.5} />
                   </span>
                 )}
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/65 to-transparent px-2 py-1.5 text-[10px] text-white/85">
@@ -117,5 +117,36 @@ export function MediaLibrary({ channelId }: { channelId: number }) {
         <p className="mt-3 text-[11px] text-muted">{t("Показаны последние", "Showing the latest")} {visible.length} {t("вложений канала", "channel attachments")} · {locale.toUpperCase()}</p>
       )}
     </div>
+  );
+}
+
+/** Плитка с превью: грузит лёгкий /thumb, при ошибке показывает иконку. */
+function MediaThumb({ chatId, messageId, video, label }: { chatId: number; messageId: number; video: boolean; label?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span className="grid size-full place-items-center text-muted">
+        {video ? <Film size={22} strokeWidth={1.5} /> : <ImageIcon size={22} strokeWidth={1.5} />}
+      </span>
+    );
+  }
+  return (
+    <>
+      <img
+        src={messageThumbUrl(chatId, messageId)}
+        alt={label ?? ""}
+        loading="lazy"
+        decoding="async"
+        className="size-full object-cover transition duration-300 group-hover:scale-[1.03]"
+        onError={() => setFailed(true)}
+      />
+      {video && (
+        <span className="pointer-events-none absolute inset-0 grid place-items-center">
+          <span className="grid size-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm">
+            <Film size={15} />
+          </span>
+        </span>
+      )}
+    </>
   );
 }

@@ -14,7 +14,7 @@ from app.cache.manager import touch_cached_media
 from app.database import fetchone
 from app.deps import get_current_account
 from app.models import MessageOut
-from app.telegram.media import download_message_media, resolve_media_file
+from app.telegram.media import download_message_media, ensure_thumbnail, resolve_media_file
 from app.telegram.messages import delete_message, list_messages, react_to_message, send_message, send_video_note, set_message_pinned
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -142,3 +142,28 @@ async def message_media(
         media_type=media_type or "application/octet-stream",
         filename=path.name,
     )
+
+
+@router.get("/{chat_id}/{message_id}/thumb")
+async def message_thumbnail(
+    chat_id: int,
+    message_id: int,
+    account: dict[str, Any] = Depends(get_current_account),
+) -> FileResponse:
+    """Превью медиа: 640px JPEG для сеток (в 10–40 раз легче оригинала)."""
+    path = resolve_media_file(account["id"], chat_id, message_id)
+    if path is None or not path.is_file():
+        path = await download_message_media(account, chat_id, message_id)
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="Медиафайл не найден")
+    await touch_cached_media(account["id"], path, chat_id, message_id)
+    thumbnail = await ensure_thumbnail(account["id"], chat_id, message_id, path)
+    if thumbnail is not None:
+        return FileResponse(
+            thumbnail,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+    # Превью не получилось (нет ffmpeg / не изображение) — отдаём оригинал.
+    media_type, _ = mimetypes.guess_type(path.name)
+    return FileResponse(path, media_type=media_type or "application/octet-stream")

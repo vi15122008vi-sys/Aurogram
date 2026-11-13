@@ -92,6 +92,15 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
     return filter === "all" || filter === "archive" ? subset : subset.filter((chat) => chat.type === filter);
   }, [chats, filter, folders, selectedFolderId]);
 
+  /* Локальный поиск: имя, username и текст последнего сообщения из кэша. */
+  const localChats = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase();
+    if (!term) return visibleChats;
+    return visibleChats.filter((chat) =>
+      `${chat.title} ${chat.username ?? ""} ${chat.last_message ?? ""}`.toLocaleLowerCase().includes(term),
+    );
+  }, [visibleChats, query]);
+
   async function createFolder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = folderName.trim();
@@ -129,7 +138,9 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
       <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">{t("INBOX")}</p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-ink">{t("Чаты")}</h1>
-        <span className="rounded-full bg-surface/60 px-2.5 py-1 font-mono text-[10px] tabular-nums text-muted">{visibleChats.length}</span>
+        <span className="rounded-full bg-surface/60 px-2.5 py-1 font-mono text-[10px] tabular-nums text-muted">
+          {localChats.length}{query.trim() ? ` / ${visibleChats.length}` : ""}
+        </span>
       </div>
       {offline && <OfflineBanner className="mt-3" />}
 
@@ -155,15 +166,20 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
         </div>
       </div>
 
-      {query.trim().length >= 2 ? (
-        <div className="mt-4 space-y-4">
+      {query.trim().length >= 2 && (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-semibold text-ink">{t("Глобальный поиск", "Global search")}</h2>
+            <span className="ml-auto text-[10px] text-muted">{t("по кэшу аккаунта", "in the account cache")}</span>
+          </div>
           {searching && <p className="text-xs text-muted">{t("Ищем в кэше…")}</p>}
           {!!searchResults?.chats.length && <section><h2 className="mb-2 text-xs font-semibold text-muted">{t("Чаты")}</h2><div className="glass-panel overflow-hidden rounded-[24px] p-1">{searchResults.chats.map((chat) => <button key={chat.id} type="button" onClick={() => onOpen?.({ ...chat, archived: false, last_message: null })} className={`relative flex w-full items-center gap-3 rounded-[20px] p-2.5 text-left transition hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] ${rowDivider}`}><span className="grid size-9 place-items-center rounded-full bg-accent/15 text-sm font-semibold text-accent">{chat.title.slice(0, 1)}</span><span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{chat.title}</span>{chat.username && <span className="text-xs text-muted">@{chat.username}</span>}</button>)}</div></section>}
           {!!searchResults?.messages.length && <section><h2 className="mb-2 text-xs font-semibold text-muted">{t("Сообщения")}</h2><div className="glass-panel overflow-hidden rounded-[24px] p-1">{searchResults.messages.map((message) => <button key={`${message.chat_id}:${message.message_id}`} type="button" onClick={() => onOpen?.({ id: message.chat_id, title: message.chat_title || String(message.chat_id), type: message.chat_type || "user", archived: false, unread: 0, last_message: message.text, last_message_date: message.date })} className={`relative block w-full rounded-[20px] p-3 text-left transition hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)] ${rowDivider}`}><span className="block truncate text-xs font-semibold text-accent">{message.chat_title || t("Чат")}</span><span className="mt-1 block line-clamp-2 text-sm text-ink">{message.text}</span></button>)}</div></section>}
           {!searching && searchResults && !searchResults.chats.length && !searchResults.messages.length && <p className="py-8 text-center text-sm text-muted">{t("Ничего не найдено в кэше")}</p>}
           {!searchResults && !searching && <p className="py-8 text-center text-xs text-muted">{t("Введите не менее двух символов")}</p>}
         </div>
-      ) : <>
+      )}
+      <>
       <div role="tablist" aria-label={t("Фильтр чатов")} className="glass-panel mt-5 flex w-full gap-1 overflow-x-auto rounded-[22px] p-1.5">
         {filters.map(({ id, label }) => (
           <button
@@ -204,7 +220,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
         </div>
       ) : (
       <div className="glass-panel mt-3 overflow-visible rounded-[26px] p-1">
-        {visibleChats.map((chat) => (
+        {localChats.map((chat) => (
           <article key={chat.id} className={`group relative flex items-center gap-1 px-0.5 ${rowDivider}`}>
             <button type="button" onClick={() => onOpen?.(chat)} className="glass-hover flex min-w-0 flex-1 items-center gap-3 rounded-[20px] p-2 text-left transition duration-200 hover:bg-[color-mix(in_srgb,var(--ink)_5%,transparent)]">
               <Avatar name={chat.title} id={chat.id} src={chatAvatarUrl(chat.id)} className="size-12 shrink-0 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_8%),0_8px_20px_rgb(0_0_0_/_18%)]" />
@@ -254,10 +270,10 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
             </div>
           </article>
         ))}
-        {!visibleChats.length && <div className="flex min-h-32 items-center justify-center gap-2 px-4 py-12 text-center text-sm text-muted">{t(filter === "archive" ? "Архив пуст" : "Чатов пока нет")}</div>}
+        {!localChats.length && <div className="flex min-h-32 items-center justify-center gap-2 px-4 py-12 text-center text-sm text-muted">{query.trim() ? t("Локально ничего не нашлось", "Nothing found locally") : t(filter === "archive" ? "Архив пуст" : "Чатов пока нет")}</div>}
       </div>
       )}
-      </>}
+      </>
     </section>
   );
 }

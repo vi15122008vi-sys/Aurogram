@@ -11,6 +11,13 @@ from app.models import (
     SendCodeRequest,
     SignInRequest,
 )
+from app.ratelimit import (
+    QR_LIMITER,
+    RECOVER_LIMITER,
+    SEND_CODE_LIMITER,
+    SIGN_IN_LIMITER,
+    limit_requests,
+)
 from app.telegram import auth as telegram_auth
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -51,8 +58,8 @@ async def register_key(
     return _without_token(result)
 
 
-@router.post("/send-code")
-@router.post("/send_code", include_in_schema=False)
+@router.post("/send-code", dependencies=[Depends(limit_requests(SEND_CODE_LIMITER, "auth.send_code"))])
+@router.post("/send_code", include_in_schema=False, dependencies=[Depends(limit_requests(SEND_CODE_LIMITER, "auth.send_code"))])
 async def send_code(
     payload: SendCodeRequest,
     request: Request,
@@ -71,8 +78,8 @@ async def send_code(
     return _without_token(result)
 
 
-@router.post("/sign-in")
-@router.post("/sign_in", include_in_schema=False)
+@router.post("/sign-in", dependencies=[Depends(limit_requests(SIGN_IN_LIMITER, "auth.sign_in"))])
+@router.post("/sign_in", include_in_schema=False, dependencies=[Depends(limit_requests(SIGN_IN_LIMITER, "auth.sign_in"))])
 async def sign_in(
     payload: SignInRequest,
     request: Request,
@@ -93,7 +100,7 @@ async def sign_in(
     return _without_token(result)
 
 
-@router.post("/qr")
+@router.post("/qr", dependencies=[Depends(limit_requests(QR_LIMITER, "auth.qr"))])
 async def start_qr(
     request: Request,
     response: Response,
@@ -111,7 +118,7 @@ async def qr_status(
     return _without_token(await telegram_auth.check_qr(account["id"]))
 
 
-@router.post("/recover-password")
+@router.post("/recover-password", dependencies=[Depends(limit_requests(RECOVER_LIMITER, "auth.recover"))])
 async def recover_password(payload: RecoverPasswordRequest) -> dict[str, Any]:
     return await telegram_auth.recover_password(payload.phone)
 

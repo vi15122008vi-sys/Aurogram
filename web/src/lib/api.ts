@@ -218,6 +218,11 @@ export function messageMediaUrl(chatId: number, messageId: number): string {
   return apiUrl(`/messages/${chatId}/${messageId}/media`);
 }
 
+/** Превью вложения: 640px JPEG, которое бэкенд готовит и кэширует. */
+export function messageThumbUrl(chatId: number, messageId: number): string {
+  return apiUrl(`/messages/${chatId}/${messageId}/thumb`);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   let deviceId = localStorage.getItem("aurogram.device_id");

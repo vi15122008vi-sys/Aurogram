@@ -1,12 +1,13 @@
-import { LogOut } from "lucide-react";
+import { LogOut, Phone } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
 interface TopBarProps {
   accountName: string;
   onLogout: () => void;
+  onCall?: () => void;
 }
 
-export function TopBar({ accountName, onLogout }: TopBarProps) {
+export function TopBar({ accountName, onLogout, onCall }: TopBarProps) {
   const { t } = useI18n();
   return (
     <header className="sticky top-0 z-20 bg-[color-mix(in_srgb,var(--canvas)_78%,transparent)] px-2 pt-2 backdrop-blur-[18px] sm:px-4 sm:pt-3">
@@ -31,6 +32,18 @@ export function TopBar({ accountName, onLogout }: TopBarProps) {
             <span className="max-w-40 truncate text-xs text-muted">{accountName}</span>
           </span>
           <span className="size-2 rounded-full bg-success shadow-[0_0_8px_var(--success)] sm:hidden" aria-hidden="true" />
+          {onCall && (
+            <button
+              type="button"
+              className="glass-hover flex h-9 items-center gap-1.5 rounded-[14px] bg-surface/60 px-2.5 text-muted transition duration-200 hover:bg-success/10 hover:text-success"
+              onClick={onCall}
+              aria-label={t("Позвонить", "Call")}
+              title={t("Позвонить", "Call")}
+            >
+              <Phone size={16} strokeWidth={1.6} />
+              <span className="hidden text-xs font-medium sm:inline">{t("Позвонить", "Call")}</span>
+            </button>
+          )}
           <button
             type="button"
             className="glass-hover grid size-9 place-items-center rounded-[14px] bg-surface/60 text-muted transition duration-200 hover:bg-accent/10 hover:text-accent"

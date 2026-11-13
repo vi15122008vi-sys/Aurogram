@@ -37,6 +37,17 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await init_db()
+    from app.security import audit_secrets, ensure_secret_key
+
+    if not ensure_secret_key():
+        log.warning(
+            "SECRET_KEY непригоден: ключи аккаунтов и токены ботов сохранить не удастся "
+            "(эндпоинты вернут 503)"
+        )
+    try:
+        await audit_secrets()
+    except Exception as exc:  # аудит не должен мешать старту
+        log.warning("security audit failed: %s", exc)
     from app.telegram.listener import main as listener_main
 
     listener_task = asyncio.create_task(listener_main(), name="telegram-listener")
