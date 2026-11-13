@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Bot, MessageCircle, Radio, RefreshCw } from "lucide-react";
-import { api, type AuthAccount, type BotRecord, type ChatRecord } from "../lib/api";
+import { ApiError, api, type AuthAccount, type BotRecord, type ChatRecord } from "../lib/api";
 import type { AppTab } from "../components/BottomNav";
 import { Channels } from "./Channels";
 import { ChannelDetail } from "./ChannelDetail";
@@ -47,6 +47,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   const [archivingId, setArchivingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authExpired, setAuthExpired] = useState(false);
   const [offline, setOffline] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const chatMode = tab === "chats" && chatFilter === "archive" ? "archive" : "active";
@@ -73,6 +74,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
         writeCache(cacheKey, items);
       })
       .catch((cause: unknown) => {
+      if (cause instanceof ApiError && cause.status === 401) { setAuthExpired(true); return; }
         if (!active) return;
         // Нет сети — показываем последний удачный ответ и баннер «Показан кэш».
         if (isOfflineError(cause)) {
@@ -135,7 +137,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
         </section>
       );
     }
-    return <ChatList chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={(chat) => void toggleChatArchive(chat)} archivingId={archivingId} loading={loading} error={error} offline={offline} />;
+    return <ChatList authExpired={authExpired} chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={(chat) => void toggleChatArchive(chat)} archivingId={archivingId} loading={loading} error={error} offline={offline} />;
   }
 
   const content = tabContent[tab as keyof typeof tabContent];

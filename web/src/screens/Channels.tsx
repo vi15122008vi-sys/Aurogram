@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight, ChartNoAxesColumn, Eye, Gamepad2, Radio, RefreshCw, Search, Send, Sticker, Timer, Users, X } from "lucide-react";
-import { api, type ChannelRecord } from "../lib/api";
+import { ApiError, api, type ChannelRecord } from "../lib/api";
 import { Avatar } from "../components/Avatar";
 import { Fab } from "../components/Fab";
 import { StudioModal, type StudioSection } from "../components/StudioModal";
+import { AuthErrorBanner } from "../components/AuthErrorBanner";
 import { useI18n } from "../lib/i18n";
 
 interface ChannelsProps {
@@ -20,6 +21,7 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: Channe
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authExpired, setAuthExpired] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
@@ -39,6 +41,7 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: Channe
         if (active) setChannels(result);
       })
       .catch((cause: unknown) => {
+        if (cause instanceof ApiError && cause.status === 401) { setAuthExpired(true); return; }
         if (active) setError(t(cause instanceof Error ? cause.message : "Не удалось загрузить каналы"));
       })
       .finally(() => {
@@ -131,6 +134,7 @@ export function Channels({ onOpen, onPublish, onSchedule, onStatistics }: Channe
         </label>
       </div>
 
+      {authExpired && <AuthErrorBanner />}
       {error && <p role="alert" className="mt-4 rounded-[20px] bg-danger/10 px-3.5 py-2.5 text-sm text-danger shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--danger)_18%,transparent)]">{error}</p>}
 
       {filteredChannels.length ? (

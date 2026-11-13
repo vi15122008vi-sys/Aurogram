@@ -8,11 +8,14 @@ import { StoryViewer } from "../components/StoryViewer";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { Skeleton } from "../components/Skeleton";
 import { openCall } from "../lib/callbus";
+import { AuthErrorBanner } from "../components/AuthErrorBanner";
 import { useI18n } from "../lib/i18n";
 
 export type ChatFilter = "all" | "user" | "group" | "channel" | "archive";
 
 interface ChatListProps {
+  /** Сессия истекла — показываем баннер повторного входа. */
+  authExpired?: boolean;
   chats: ChatRecord[];
   filter: ChatFilter;
   archivingId?: number | null;
@@ -49,7 +52,7 @@ function chatTime(value: string | null | undefined, locale: "ru" | "en"): string
 /* Разделитель строк — волосяная линия вместо border у ячейки. */
 const rowDivider = "after:pointer-events-none after:absolute after:inset-x-4 after:bottom-0 after:h-px after:bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] after:content-[''] last:after:hidden";
 
-export function ChatList({ chats, filter, archivingId, loading = false, error, offline = false, onFilterChange, onOpen, onArchive }: ChatListProps) {
+export function ChatList({ authExpired = false, chats, filter, archivingId, loading = false, error, offline = false, onFilterChange, onOpen, onArchive }: ChatListProps) {
   const { t, locale } = useI18n();
   const [menuChatId, setMenuChatId] = useState<number | null>(null);
   const [stories, setStories] = useState<StoryPeer[]>([]);
@@ -222,6 +225,7 @@ export function ChatList({ chats, filter, archivingId, loading = false, error, o
       {creatingFolder && <form onSubmit={createFolder} className="mt-2 flex max-w-sm gap-2"><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} maxLength={32} placeholder={t("Название папки")} className="h-9 min-w-0 flex-1 rounded-[16px] bg-surface/60 px-3 text-xs text-ink outline-none placeholder:text-muted focus:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_35%,transparent)]" /><button type="submit" disabled={!folderName.trim()} className="rounded-[16px] bg-accent px-3 text-xs font-medium text-white disabled:opacity-50">{t("Создать")}</button></form>}
       {folderError && <p role="alert" className="mt-2 text-xs text-danger">{folderError}</p>}
 
+      {authExpired && <AuthErrorBanner />}
       {error && <p role="alert" className="mt-3 rounded-[18px] bg-danger/10 px-3 py-2 text-sm text-danger shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--danger)_18%,transparent)]">{error}</p>}
 
       {loading && !visibleChats.length ? (
