@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     cache_max_messages_per_chat: int = Field(default=1000, alias="CACHE_MAX_MESSAGES_PER_CHAT")
     # Мастер-код приглашения: работает всегда, даже если база пуста.
     invite_code: str = Field(default="", alias="INVITE_CODE")
+    # Публичный адрес, по которому открываются сгенерированные виджеты.
+    widget_public_base_url: str = Field(default="https://aurogram.dpdns.org", alias="WIDGET_PUBLIC_BASE_URL")
 
     admin_user: str = Field(default="admin", alias="ADMIN_USER")
     admin_password: str = Field(default="change-me", alias="ADMIN_PASSWORD")

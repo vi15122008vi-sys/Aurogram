@@ -16,6 +16,7 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
   const [prompt, setPrompt] = useState("");
   const [html, setHtml] = useState<string | null>(null);
   const [widgetButtons, setWidgetButtons] = useState<{ text: string; callback_data: string }[]>([]);
+  const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -30,6 +31,7 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
       const result = await api.ai.widget(value, channelId);
       setHtml(result.html);
       setWidgetButtons(result.buttons ?? []);
+      setWidgetUrl(result.url);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("AI не смог собрать виджет"));
     } finally {
@@ -130,7 +132,9 @@ export function AiWidgetStudio({ channelId }: AiWidgetStudioProps) {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] text-muted">{html.length} {t("символов", "chars")}</span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-muted">
+                      {widgetUrl ? <a href={widgetUrl} target="_blank" rel="noreferrer" className="text-accent underline">{widgetUrl}</a> : `${html.length} ${t("символов", "chars")}`}
+                    </span>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => void copyHtml()} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface/60 px-3.5 text-[11px] font-medium text-ink transition hover:text-accent">
                         {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}

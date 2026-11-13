@@ -11,10 +11,12 @@ from __future__ import annotations
 import html
 from typing import Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/widgets", tags=["widgets"])
+# Публичный роутер: Telegram открывает /widgets/{slug} без префикса /api.
+public_router = APIRouter(prefix="/widgets", tags=["widgets"])
 
 MAX_TITLE = 80
 ACCENTS = {"blue", "indigo", "violet", "amber", "green"}
@@ -193,3 +195,33 @@ async def widget_page(
         headers={"Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff"},
     )
 
+
+async def _stored_html(slug: str) -> str:
+    from app.database import fetchone
+
+    row = await fetchone("SELECT html FROM widgets WHERE slug = ?", (slug,))
+    if not row:
+        raise HTTPException(status_code=404, detail="Виджет не найден")
+    return row["html"]
+
+
+@router.get("/{slug}", response_class=HTMLResponse)
+async def get_stored_widget(slug: str) -> HTMLResponse:
+    """HTML сгенерированного виджета по UUID-slug."""
+    return _widget_response(await _stored_html(slug))
+
+
+@public_router.get("/{slug}", response_class=HTMLResponse)
+async def get_stored_widget_public(slug: str) -> HTMLResponse:
+    return _widget_response(await _stored_html(slug))
+
+
+def _widget_response(html: str) -> HTMLResponse:
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+        },
+    )

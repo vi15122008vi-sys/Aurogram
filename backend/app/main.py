@@ -33,6 +33,7 @@ from app.api.stickers import router as stickers_router
 from app.api.users import router as users_router
 from app.api.textstyles import router as textstyles_router
 from app.api.themes import router as themes_router
+from app.api.widgets import public_router as widgets_public_router
 from app.api.widgets import router as widgets_router
 from app.config import get_settings
 from app.database import init_db
@@ -153,6 +154,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse({"detail": "Внутренняя ошибка сервера"}, status_code=500)
 
 
+app.include_router(widgets_public_router)
 app.include_router(admin_router)
 static_dir = Path(__file__).parent / "admin" / "static"
 app.mount("/admin/static", StaticFiles(directory=static_dir), name="admin-static")

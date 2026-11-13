@@ -140,15 +140,26 @@ async def create_widget(
         ) from exc
     except AiError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    import hashlib
+    import uuid
 
-    slug = hashlib.sha1(result["html"].encode("utf-8")).hexdigest()[:16]
+    from app.config import get_settings
+    from app.database import execute
+
+    # UUID4 вместо sha1: slug нельзя предсказать/подделать, HTML живёт в БД.
+    slug = uuid.uuid4().hex
+    await execute(
+        "INSERT INTO widgets (slug, html, prompt, account_id) VALUES (?, ?, ?, ?)",
+        (slug, result["html"], payload.prompt.strip()[:500], account["id"]),
+    )
+    base = get_settings().widget_public_base_url.rstrip("/")
     return {
+        "slug": slug,
+        "url": f"{base}/widgets/{slug}",
         "html": result["html"],
         "chars": result["chars"],
         "title": payload.prompt.strip()[:60],
         "channel_id": payload.channel_id,
-        # Готовый inline_keyboard для поста: кнопка открывает виджет через бота.
+        # Кнопка открывает WebApp/страницу виджета; slug — случайный UUID.
         "buttons": [
             {"text": "▶ Открыть виджет", "callback_data": f"widget:{slug}"},
             {"text": "Другой виджет", "callback_data": "widget:reroll"},

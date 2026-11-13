@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import re
 from html import escape
 from typing import Any
@@ -106,7 +108,36 @@ async def bot_webhook(
             )
         except BotError as exc:
             log.warning("callback answer failed: %s", exc)
-        return {"ok": True, "callback": callback.get("data")}
+
+        data = str(callback.get("data") or "")
+        chat = (callback.get("message") or {}).get("chat") or {}
+        if data.startswith("widget:") and chat.get("id"):
+            from app.config import get_settings
+            from app.database import fetchone
+
+            slug = data.split(":", 1)[1]
+            row = await fetchone("SELECT slug FROM widgets WHERE slug = ?", (slug,)) if slug != "reroll" else None
+            if row:
+                base = get_settings().widget_public_base_url.rstrip("/")
+                await call(
+                    "sendMessage",
+                    data={
+                        "chat_id": str(chat["id"]),
+                        "text": "Виджет готов — открой и проверь 👇",
+                        "reply_markup": json.dumps({
+                            "inline_keyboard": [[{
+                                "text": "▶ Открыть виджет",
+                                "url": f"{base}/widgets/{slug}",
+                            }]]
+                        }),
+                    },
+                )
+            else:
+                await call(
+                    "sendMessage",
+                    data={"chat_id": str(chat["id"]), "text": "Виджет не найден — сгенерируйте новый."},
+                )
+        return {"ok": True, "callback": data}
 
     # 1. Запрос не от Telegram-вебхука нашего бота — не отвечаем вообще.
     if not is_internal_request(x_telegram_bot_api_secret_token):
