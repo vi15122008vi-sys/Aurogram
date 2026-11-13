@@ -236,8 +236,11 @@ class DomainIn(BaseModel):
 
 
 class PostButton(BaseModel):
+    """Inline-кнопка: либо ссылка, либо callback для бота."""
+
     text: str = Field(min_length=1, max_length=64)
-    url: str = Field(min_length=8, max_length=512)
+    url: str | None = Field(default=None, max_length=512)
+    callback_data: str | None = Field(default=None, max_length=64)
 
 
 class PostCreate(BaseModel):

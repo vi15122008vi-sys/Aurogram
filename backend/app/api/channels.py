@@ -593,6 +593,21 @@ async def move_scheduled_post(
 
     client = await get_client(account["id"], account)
     try:
+        from telethon.tl.functions.messages import GetScheduledHistoryRequest
+
+        peer = await client.get_input_entity(channel_id)
+        scheduled = await with_floodwait(lambda: client(GetScheduledHistoryRequest(peer, 0)))
+        scheduled_ids = {int(message.id) for message in (scheduled.messages or [])}
+        if int(post_id) not in scheduled_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="Нельзя изменить дату опубликованного поста",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Не удалось получить расписание: {exc}") from exc
+    try:
         message = await with_floodwait(lambda: client.get_messages(channel_id, ids=post_id))
         text = getattr(message, "message", "") or ""
         entity = await client.get_input_entity(channel_id)

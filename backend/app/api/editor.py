@@ -61,7 +61,13 @@ async def publish_post(
             schedule=payload.schedule_at,
             silent=payload.silent,
             buttons=(
-                [[Button.url(item.text, item.url) for item in payload.buttons]]
+                [[
+                    Button.inline(item.text, item.callback_data[:64])
+                    if item.callback_data
+                    else Button.url(item.text, item.url)
+                    for item in payload.buttons
+                    if item.callback_data or (item.url and item.url.startswith(("http://", "https://")))
+                ]]
                 if payload.buttons
                 else None
             ),

@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 
-from app.bot.client import BotError, create_sticker_set, get_me, get_updates, send_message, set_webhook, webhook_info
+from app.bot.client import BotError, call, create_sticker_set, get_me, get_updates, send_message, set_webhook, webhook_info
 from app.bot.guard import allowed_user_ids, internal_secret, is_allowed_user, is_internal_request
 from app.config import get_settings
 from app.deps import get_current_account
@@ -92,6 +92,21 @@ async def bot_webhook(
         update = await request.json()
     except ValueError:
         return {"ok": True, "ignored": "payload"}
+
+    # 0. Callback-кнопки из постов: подтверждаем нажатие, чтобы у клиента не крутился спиннер.
+    callback = update.get("callback_query")
+    if isinstance(callback, dict) and callback.get("id"):
+        try:
+            await call(
+                "answerCallbackQuery",
+                data={
+                    "callback_query_id": callback["id"],
+                    "text": "Готово",
+                },
+            )
+        except BotError as exc:
+            log.warning("callback answer failed: %s", exc)
+        return {"ok": True, "callback": callback.get("data")}
 
     # 1. Запрос не от Telegram-вебхука нашего бота — не отвечаем вообще.
     if not is_internal_request(x_telegram_bot_api_secret_token):

@@ -21,13 +21,17 @@ export function CalendarPanel({ channelId }: CalendarPanelProps) {
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   });
+  const [published, setPublished] = useState<{ id: number; text: string; date: string }[]>([]);
+  const [showPublished, setShowPublished] = useState(false);
   const [editing, setEditing] = useState<{ id: number; value: string } | null>(null);
+  const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
       setPosts(await api.editor.scheduled(channelId));
+      if (showPublished) setPublished(await api.channels.publishedPosts(channelId));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("Не удалось загрузить расписание"));
@@ -38,16 +42,21 @@ export function CalendarPanel({ channelId }: CalendarPanelProps) {
 
   useEffect(() => {
     void load();
-  }, [channelId]);
+  }, [channelId, showPublished]);
 
   const byDay = useMemo(() => {
-    const map = new Map<string, MessageRecord[]>();
+    type DayEntry = { id: number; text: string; date: string; kind: "scheduled" | "published" };
+    const map = new Map<string, DayEntry[]>();
     for (const post of posts) {
       const key = isoDay(post.date);
-      map.set(key, [...(map.get(key) ?? []), post]);
+      map.set(key, [...(map.get(key) ?? []), { id: post.id, text: post.text ?? "", date: post.date, kind: "scheduled" as const }]);
+    }
+    for (const post of published) {
+      const key = isoDay(post.date);
+      map.set(key, [...(map.get(key) ?? []), { id: post.id, text: post.text ?? "", date: post.date, kind: "published" as const }]);
     }
     return map;
-  }, [posts]);
+  }, [posts, published]);
 
   const cells = useMemo(() => {
     const first = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), 1));
@@ -92,6 +101,10 @@ export function CalendarPanel({ channelId }: CalendarPanelProps) {
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{monthLabel}</p>
           </div>
         </div>
+        <label className="flex items-center gap-1.5 text-[10px] text-muted">
+          <input type="checkbox" checked={showPublished} onChange={(event) => setShowPublished(event.target.checked)} className="size-3.5 accent-[var(--accent)]" />
+          {t("Показать опубликованные")}
+        </label>
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => setMonth(new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() - 1, 1)))} aria-label={t("Предыдущий месяц")} className="grid size-8 place-items-center rounded-full bg-surface/60 text-muted transition hover:text-ink"><ChevronLeft size={15} /></button>
           <button type="button" onClick={() => setMonth(new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1)))} aria-label={t("Следующий месяц")} className="grid size-8 place-items-center rounded-full bg-surface/60 text-muted transition hover:text-ink"><ChevronRight size={15} /></button>
@@ -117,8 +130,12 @@ export function CalendarPanel({ channelId }: CalendarPanelProps) {
                   <button
                     key={post.id}
                     type="button"
-                    onClick={() => setEditing({ id: post.id, value: new Date(post.date).toISOString().slice(0, 16) })}
-                    className="w-full truncate rounded-[6px] bg-accent/15 px-1 py-0.5 text-left text-[9px] text-accent"
+                    onClick={() => {
+                      if (post.kind === "published") { setLocked(true); return; }
+                      setLocked(false);
+                      setEditing({ id: post.id, value: new Date(post.date).toISOString().slice(0, 16) });
+                    }}
+                    className={`w-full truncate rounded-[6px] px-1 py-0.5 text-left text-[9px] ${post.kind === "published" ? "bg-[color-mix(in_srgb,var(--ink)_10%,transparent)] text-muted" : "bg-accent/15 text-accent"}`}
                     title={post.text || `#${post.id}`}
                   >
                     {new Date(post.date).toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-US", { hour: "2-digit", minute: "2-digit" })} · {(post.text || `#${post.id}`).slice(0, 18)}
@@ -129,6 +146,12 @@ export function CalendarPanel({ channelId }: CalendarPanelProps) {
           );
         })}
       </div>
+
+      {locked && (
+        <p role="status" className="mt-3 rounded-[14px] bg-danger/10 px-3 py-2 text-xs text-danger">
+          {t("Нельзя изменить дату опубликованного поста")}
+        </p>
+      )}
 
       {editing && (
         <div className="mt-3 flex flex-wrap items-end gap-2 rounded-[16px] bg-surface/60 p-3">

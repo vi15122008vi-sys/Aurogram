@@ -17,7 +17,7 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
   const [scheduleAt, setScheduleAt] = useState("");
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<number[]>([channelId]);
-  const [postButtons, setPostButtons] = useState<{ text: string; url: string }[]>([]);
+  const [postButtons, setPostButtons] = useState<{ text: string; url: string; kind: "url" | "callback"; callbackData: string }[]>([]);
   const [preview, setPreview] = useState<EditorPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +156,13 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
             text,
             parse_mode: "md",
             schedule_at: schedule ? new Date(scheduleAt).toISOString() : null,
-            buttons: postButtons.filter((item) => item.text.trim() && /^https?:\/\//.test(item.url.trim())),
+            buttons: postButtons
+              .filter((item) => item.text.trim() && (item.kind === "callback" ? item.callbackData.trim() : /^https?:\/\//.test(item.url.trim())))
+              .map((item) =>
+                item.kind === "callback"
+                  ? { text: item.text.trim(), callback_data: item.callbackData.trim() }
+                  : { text: item.text.trim(), url: item.url.trim() },
+              ),
           });
         } catch (cause) {
           failures.push(`${target}: ${cause instanceof Error ? cause.message : "error"}`);
@@ -290,7 +296,7 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
             <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted">Добавить кнопку</p>
             <button
               type="button"
-              onClick={() => setPostButtons((current) => [...current, { text: "", url: "" }].slice(0, 10))}
+              onClick={() => setPostButtons((current) => [...current, { text: "", url: "", kind: "url" as "url" | "callback", callbackData: "" }].slice(0, 10))}
               className="inline-flex h-7 items-center rounded-full bg-accent/10 px-2.5 text-[11px] font-medium text-accent transition hover:bg-accent/15"
             >
               + Кнопка
@@ -301,7 +307,16 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
           ) : (
             <div className="mt-2 grid gap-1.5">
               {postButtons.map((button, index) => (
-                <div key={index} className="flex gap-1.5">
+                <div key={index} className="flex flex-wrap items-center gap-1.5">
+                  <select
+                    value={button.kind}
+                    onChange={(event) => setPostButtons((current) => current.map((item, i) => i === index ? { ...item, kind: event.target.value as "url" | "callback" } : item))}
+                    className="h-8 rounded-[10px] bg-surface/60 px-2 text-[11px] text-ink outline-none"
+                    aria-label="Тип кнопки"
+                  >
+                    <option value="url">URL</option>
+                    <option value="callback">Callback</option>
+                  </select>
                   <input
                     value={button.text}
                     onChange={(event) => setPostButtons((current) => current.map((item, i) => i === index ? { ...item, text: event.target.value } : item))}
@@ -310,9 +325,9 @@ export function PostEditor({ channelId, onPublished, focusSchedule = false }: Po
                     className="h-8 w-28 rounded-[10px] bg-surface/60 px-2 text-[11px] text-ink outline-none"
                   />
                   <input
-                    value={button.url}
-                    onChange={(event) => setPostButtons((current) => current.map((item, i) => i === index ? { ...item, url: event.target.value } : item))}
-                    placeholder="https://example.com"
+                    value={button.kind === "callback" ? button.callbackData : button.url}
+                    onChange={(event) => setPostButtons((current) => current.map((item, i) => i === index ? item.kind === "callback" ? { ...item, callbackData: event.target.value } : { ...item, url: event.target.value } : item))}
+                    placeholder={button.kind === "callback" ? "action:start" : "https://example.com"}
                     className="h-8 min-w-0 flex-1 rounded-[10px] bg-surface/60 px-2 font-mono text-[11px] text-ink outline-none"
                   />
                   <button
