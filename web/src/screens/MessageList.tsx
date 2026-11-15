@@ -125,17 +125,40 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     getScrollElement: () => parentRef.current,
     estimateSize: () => 88,
     overscan: 8,
+    getItemKey: (index: number) => rows[index]?.key ?? index,
   });
 
-  // Чат открывается на последнем сообщении (новые внизу).
+  // Чат открывается на последнем сообщении. Два кадра + добивка: после
+  // measureElement высоты строк меняются, иначе скролл «прыгает» наверх.
   useEffect(() => {
     if (!rows.length) return;
-    const id = window.setTimeout(() => {
-      virtualizer.scrollToIndex(rows.length - 1, { align: "end" });
-    }, 40);
-    return () => window.clearTimeout(id);
+    let raf1 = 0;
+    let raf2 = 0;
+    const jump = () => virtualizer.scrollToIndex(rows.length - 1, { align: "end" });
+    raf1 = window.requestAnimationFrame(() => {
+      jump();
+      raf2 = window.requestAnimationFrame(jump);
+    });
+    const timer = window.setTimeout(jump, 200);
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+      window.clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows.length]);
+  }, [rows.length, virtualizer]);
+
+  // Липкая дата: берём разделитель, к которому относится первый видимый ряд.
+  const virtualItems = virtualizer.getVirtualItems();
+  const activeDateLabel = (() => {
+    if (!virtualItems.length) {
+      return rows.length ? (rows[0].kind === "divider" ? rows[0].label : null) : null;
+    }
+    let index = virtualItems[0].index;
+    while (index > 0 && rows[index]?.kind !== "divider") index -= 1;
+    const row = rows[index];
+    return row?.kind === "divider" ? row.label : null;
+  })();
 
   useEffect(() => {
     let active = true;
@@ -153,11 +176,11 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
       })
       .catch((cause: unknown) => {
         if (cause instanceof ApiError && cause.status === 401) setAuthExpired(true);
-          if (cause instanceof ApiError && cause.status === 429) {
-            const seconds = cause.retryAfter ?? Number((cause.message.match(/(\d+)/) ?? [])[1] ?? 60);
-            wasFloodWait.current = true;
-            setRetryLeft(seconds);
-          }
+        if (cause instanceof ApiError && cause.status === 429) {
+          const seconds = cause.retryAfter ?? Number((cause.message.match(/(\d+)/) ?? [])[1] ?? 60);
+          wasFloodWait.current = true;
+          setRetryLeft(seconds);
+        }
         if (!active) return;
         // Нет сети — поднимаем последнюю копию переписки из localStorage.
         if (isOfflineError(cause)) {
@@ -302,6 +325,13 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
         )}
         {loading && !!messages.length && <div className="flex justify-center py-3 text-muted"><LoaderCircle size={16} className="animate-spin" /></div>}
         {!loading && !messages.length && <p className="py-10 text-center text-sm text-muted">{t("Сообщений нет")}</p>}
+        {activeDateLabel && (
+          <div className="pointer-events-none sticky top-0 z-20 flex h-0 justify-center">
+            <span className="translate-y-1 rounded-full bg-surface/80 px-3 py-1 font-mono text-[9px] capitalize text-muted shadow-[0_6px_16px_rgb(0_0_0_/_12%),inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_5%,transparent)] backdrop-blur-[12px]">
+              {activeDateLabel}
+            </span>
+          </div>
+        )}
         {!!rows.length && (
           <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {

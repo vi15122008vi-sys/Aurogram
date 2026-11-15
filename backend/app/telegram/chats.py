@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import io
 from datetime import datetime, timezone
+from pathlib import Path
+
+from PIL import Image
 from typing import Any, Optional
 
 from telethon.tl.types import Channel, Chat, User
@@ -273,3 +277,24 @@ async def fetch_chat_history(
     if fetched:
         await prune_chat_messages(account["id"], chat_id, keep)
     return fetched
+
+
+async def get_chat_avatar(account: dict, chat_id: int) -> Path | None:
+    """Аватар чата: скачивается один раз в media_data/avatars/{chat_id}.jpg."""
+    from app.config import get_settings
+
+    avatars_dir = Path(get_settings().media_dir) / "avatars"
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+    target = avatars_dir / f"{chat_id}.jpg"
+    if target.exists() and target.stat().st_size > 0:
+        return target
+
+    client = await get_client(account["id"], account)
+    entity = await with_floodwait(lambda: client.get_entity(chat_id))
+    photo = await with_floodwait(lambda: client.download_profile_photo(entity, file=bytes))
+    if not photo:
+        return None
+    image = Image.open(io.BytesIO(photo)).convert("RGB")
+    image.thumbnail((256, 256), Image.LANCZOS)
+    image.save(target, format="JPEG", quality=86, optimize=True)
+    return target

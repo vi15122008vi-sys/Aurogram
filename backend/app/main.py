@@ -109,6 +109,15 @@ CORS_ORIGINS = [
 # Превью-деплои (<hash>.aurogram.pages.dev) теперь НЕ допускаются — если они нужны,
 # добавляйте их в CORS_ORIGINS через переменную окружения.
 app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.secret_key or secrets.token_urlsafe(32),
+    same_site="lax",
+    https_only=False,
+)
+
+# CORS добавлен последним: он оборачивает все остальные middleware,
+# поэтому даже 500 получают корректные CORS-заголовки.
+app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
@@ -117,12 +126,6 @@ app.add_middleware(
     expose_headers=["Retry-After"],
 )
 logging.getLogger("aurogram.cors").info("CORS allow_origins=%s", CORS_ORIGINS)
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.secret_key or secrets.token_urlsafe(32),
-    same_site="lax",
-    https_only=False,
-)
 
 for api_router in (
     auth_router,
@@ -158,7 +161,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     logging.getLogger("aurogram.errors").exception(
         "unhandled error on %s %s", request.method, request.url.path
     )
-    return JSONResponse({"detail": "Внутренняя ошибка сервера"}, status_code=500)
+    origin = request.headers.get("origin", "")
+    headers = (
+        {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}
+        if origin in CORS_ORIGINS
+        else {}
+    )
+    return JSONResponse({"detail": "Внутренняя ошибка сервера"}, status_code=500, headers=headers)
 
 
 app.include_router(widgets_public_router)

@@ -10,7 +10,7 @@ from app.deps import get_current_account
 from app.database import execute, fetchall
 from app.cache.manager import search_cached
 from app.models import ChatOut, MemberOut, MessageOut
-from app.telegram.chats import get_chat, get_story_avatar, get_story_media, list_chats, list_stories, read_stories
+from app.telegram.chats import get_chat, get_chat_avatar, get_story_avatar, get_story_media, list_chats, list_stories, read_stories
 from app.telegram.members import list_admins, list_members
 from app.telegram.messages import delete_message, list_messages, send_message
 
@@ -184,10 +184,14 @@ async def chat_avatar(
     chat_id: int,
     account: dict[str, Any] = Depends(get_current_account),
 ) -> Response:
-    image = await get_story_avatar(account, chat_id)
-    if not image:
+    path = await get_chat_avatar(account, chat_id)
+    if not path:
         raise HTTPException(status_code=404, detail="Аватар не найден")
-    return Response(content=image, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
+    return FileResponse(
+        path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=86400"},
+    )
 
 
 @router.put("/{chat_id}/archive")

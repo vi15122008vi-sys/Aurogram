@@ -10,9 +10,10 @@ export default defineConfig({
         // Функциональная стратегия: каждый пакет из node_modules → свой чанк.
         // Так Rollup не создаёт circular chunks и кэш не инвалидируется целиком.
         manualChunks(id: string) {
-          if (id.includes("node_modules")) {
-            return id.toString().split("node_modules/")[1].split("/")[0].toString();
-          }
+          if (!id.includes("node_modules")) return undefined;
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "vendor-react";
+          if (/node_modules\/(framer-motion|lucide-react|motion-dom|motion-utils)\//.test(id)) return "vendor-ui";
+          return "vendor-other";
         },
       },
     },
