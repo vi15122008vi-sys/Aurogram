@@ -173,6 +173,26 @@ async def _on_chat_action(account: dict, client: Any, event: Any) -> None:
         log.warning("welcome failed: %s", exc)
 
 
+def log_listener_error(account_id: str, exc: BaseException, stage: str) -> None:
+    """Пишет критические ошибки фонового listener в error.log для админки."""
+    try:
+        import traceback
+
+        from app.applog import emit_entry
+
+        emit_entry(
+            level="ERROR",
+            method="LISTENER",
+            path=f"{stage}:{account_id[:8]}",
+            error_type=type(exc).__name__,
+            message=str(exc),
+            trace="".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+            source="listener",
+        )
+    except Exception as log_exc:  # логирование не должно ронять listener
+        log.warning("listener error log failed: %s", log_exc)
+
+
 async def _run_account(account: dict, device_id: str) -> None:
     global _status, _errors_24h
     try:
@@ -189,11 +209,13 @@ async def _run_account(account: dict, device_id: str) -> None:
 
         log.info("account %s device %s: listening", account["id"][:8], device_id[:8])
         await client.run_until_disconnected()
-    except AuthKeyUnregisteredError:
+    except AuthKeyUnregisteredError as exc:
         log.error("account %s: session invalidated", account["id"][:8])
+        log_listener_error(account["id"], exc, "auth_key_unregistered")
         await execute("UPDATE accounts SET auth_state = 'dead' WHERE id = ?", (account["id"],))
         await drop_client(account["id"])
-    except SessionRevokedError:
+    except SessionRevokedError as exc:
+        log_listener_error(account["id"], exc, "session_revoked")
         # Сессию отозвали (выход из всех устройств, смена пароля 2FA).
         # Не роняем listener и не помечаем аккаунт мёртвым: ждём 60 секунд
         # и пробуем снова — сессия может ожить после повторной авторизации.
@@ -209,6 +231,7 @@ async def _run_account(account: dict, device_id: str) -> None:
         _errors_24h += 1
         _status = "reconnecting"
         log.exception("account %s crashed: %s", account["id"][:8], e)
+        log_listener_error(account["id"], e, "listener_crash")
         await asyncio.sleep(5)
 
 

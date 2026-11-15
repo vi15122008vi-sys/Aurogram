@@ -109,34 +109,17 @@ CORS_ORIGINS = [
 # allow_origin_regex намеренно убран: остаётся только явный список CORS_ORIGINS.
 # Превью-деплои (<hash>.aurogram.pages.dev) теперь НЕ допускаются — если они нужны,
 # добавляйте их в CORS_ORIGINS через переменную окружения.
-_error_logger: logging.Logger | None = None
-
-
 def _error_log_path() -> Path:
-    from app.config import get_settings
+    from app.applog import log_file
 
-    return Path(get_settings().cache_dir) / "error.log"
+    return log_file("ERROR")
 
 
 def error_logger() -> logging.Logger:
-    """Логгер ошибок с ротацией: 5 МБ × 3 файла, не переполняет диск."""
-    global _error_logger
-    if _error_logger is not None:
-        return _error_logger
+    """Логгер ошибок (error.log, 5 МБ × 3). WARN пишется отдельно — см. applog."""
+    from app.applog import rotating_logger
 
-    from logging.handlers import RotatingFileHandler
-
-    log_path = _error_log_path()
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    logger = logging.getLogger("aurogram.errorlog")
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
-    if not logger.handlers:
-        handler = RotatingFileHandler(log_path, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        logger.addHandler(handler)
-    _error_logger = logger
-    return logger
+    return rotating_logger("error.log")
 
 
 def emit_error_entry(  # noqa: PLR0913
@@ -146,27 +129,23 @@ def emit_error_entry(  # noqa: PLR0913
     path: str,
     query: str = "",
     error_type: str,
-    message: str,
+    message: str = "",
     trace: str = "",
+    source: str = "http",
 ) -> None:
-    """Пишет JSON-строку в error.log (её же читает админка)."""
-    import json
-    from datetime import datetime, timezone
+    """WARN уходит в warn.log, ERROR — в error.log (см. app/applog.py)."""
+    from app.applog import emit_entry
 
-    try:
-        entry = {
-            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "level": level,
-            "method": method,
-            "path": path,
-            "query": query,
-            "type": error_type,
-            "message": message[:500],
-            "trace": trace[-4000:],
-        }
-        error_logger().info(json.dumps(entry, ensure_ascii=False))
-    except Exception as log_exc:  # логирование не должно ронять обработку
-        logging.getLogger("aurogram.errors").warning("error.log write failed: %s", log_exc)
+    emit_entry(
+        level=level,
+        method=method,
+        path=path,
+        query=query,
+        error_type=error_type,
+        message=message,
+        trace=trace,
+        source=source,
+    )
 
 
 def write_error_log(request: Request, exc: BaseException) -> None:

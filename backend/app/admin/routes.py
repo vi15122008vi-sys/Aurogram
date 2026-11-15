@@ -400,26 +400,12 @@ async def _page_data(page: str) -> dict[str, Any]:
         )
         return {"rows": [dict(row) for row in rows]}
     if page == "errors":
-        import json
-        from pathlib import Path
+        from app.applog import read_tail
 
-        from app.config import get_settings
+        entries = read_tail(limit=50)
+        from app.applog import log_file
 
-        path = Path(get_settings().cache_dir) / "error.log"
-        entries: list[dict[str, Any]] = []
-        if path.exists():
-            from collections import deque
-
-            with path.open("r", encoding="utf-8", errors="replace") as handle:
-                lines = [line.rstrip("\n") for line in deque(handle, maxlen=200) if line.strip()]
-            for line in reversed(lines):
-                try:
-                    entries.append(json.loads(line))
-                except ValueError:
-                    continue
-                if len(entries) >= 50:
-                    break
-        return {"entries": entries, "log_path": str(path)}
+        return {"entries": entries, "log_path": str(log_file("ERROR"))}
 
     if page == "invites":
         return {"codes": await invite_list(), "master_code": invite_master()}
