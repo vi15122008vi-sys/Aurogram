@@ -44,3 +44,7 @@ local.properties
 .vscode/
 .DS_Store
 Thumbs.db
+
+# временные артефакты тестов логирования
+scripts/.log-test/
+
