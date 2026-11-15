@@ -120,6 +120,14 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     return list;
   }, [dateGroups]);
 
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 88,
+    overscan: 8,
+    getItemKey: (index: number) => rows[index]?.key ?? index,
+  });
+
   // Медиа внутри сообщений грузится асинхронно: пересчитываем высоту ряда,
   // иначе виртуальный список «дёргается» при появлении картинок/видео.
   useEffect(() => {
@@ -142,14 +150,6 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
       mutations.disconnect();
     };
   }, [virtualizer]);
-
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 88,
-    overscan: 8,
-    getItemKey: (index: number) => rows[index]?.key ?? index,
-  });
 
   // Чат открывается на последнем сообщении. Два кадра + добивка: после
   // measureElement высоты строк меняются, иначе скролл «прыгает» наверх.
