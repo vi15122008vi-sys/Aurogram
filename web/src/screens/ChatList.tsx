@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Archive, ArchiveRestore, Check, FolderPlus, MessageCircle, MoreHorizontal, Phone, Search, X } from "lucide-react";
 import { api, chatAvatarUrl, storyAvatarUrl, type ChatFolder, type ChatRecord, type GlobalSearchResult, type StoryPeer } from "../lib/api";
 import { Avatar } from "../components/Avatar";
@@ -383,3 +383,4 @@ export function ChatList({ authExpired = false, chats, filter, archivingId, load
   );
 }
 
+export default memo(ChatList);

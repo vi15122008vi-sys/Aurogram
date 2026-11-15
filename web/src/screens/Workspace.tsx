@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, Bot, MessageCircle, Radio, RefreshCw } from "lucide-react";
 import { ApiError, api, type AuthAccount, type BotRecord, type ChatRecord } from "../lib/api";
 import type { AppTab } from "../components/BottomNav";
 import { Channels } from "./Channels";
-import { ChannelDetail } from "./ChannelDetail";
 import { MessageList } from "./MessageList";
-import { ProfileScreen } from "./ProfileScreen";
-import { SettingsScreen } from "./SettingsScreen";
 import { ChatList, type ChatFilter } from "./ChatList";
+
+// Тяжёлые экраны грузим по требованию: меньше начальный бандл.
+const ChannelDetail = lazy(() => import("./ChannelDetail").then((module) => ({ default: module.ChannelDetail })));
+const ProfileScreen = lazy(() => import("./ProfileScreen").then((module) => ({ default: module.ProfileScreen })));
+const SettingsScreen = lazy(() => import("./SettingsScreen").then((module) => ({ default: module.SettingsScreen })));
+
+function LazyFallback() {
+  return <div className="grid min-h-40 place-items-center text-xs text-muted">Загрузка…</div>;
+}
 import { isOfflineError, readCache, writeCache } from "../lib/offline";
 import { useI18n } from "../lib/i18n";
 
@@ -110,7 +116,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
 
   if (tab === "channels") {
     return selectedChannel
-      ? <ChannelDetail channel={selectedChannel} initialTab={selectedChannelTab} initialSchedule={scheduleFocus} onBack={() => { setSelectedChannel(null); setScheduleFocus(false); }} />
+      ? <Suspense fallback={<LazyFallback />}><ChannelDetail channel={selectedChannel} initialTab={selectedChannelTab} initialSchedule={scheduleFocus} onBack={() => { setSelectedChannel(null); setScheduleFocus(false); }} /></Suspense>
       : <Channels
           onOpen={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(false); }}
           onPublish={(channel) => { setSelectedChannel(channel); setSelectedChannelTab("posts"); setScheduleFocus(false); }}
@@ -120,11 +126,11 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   }
 
   if (tab === "profile") {
-    return <ProfileScreen account={account} onLogout={onLogout} />;
+    return <Suspense fallback={<LazyFallback />}><ProfileScreen account={account} onLogout={onLogout} /></Suspense>;
   }
 
   if (tab === "settings") {
-    return <SettingsScreen accountName={account.name || account.phone} phone={account.phone} onLogout={onLogout} />;
+    return <Suspense fallback={<LazyFallback />}><SettingsScreen accountName={account.name || account.phone} phone={account.phone} onLogout={onLogout} /></Suspense>;
   }
 
   if (tab === "chats" || (tab === "bots" && selectedChat)) {

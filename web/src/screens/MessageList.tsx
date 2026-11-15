@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { ArrowDownToLine, LoaderCircle, Pin, PinOff, Send, StopCircle, Video } from "lucide-react";
 import { ApiError, api, type MessageRecord } from "../lib/api";
@@ -97,13 +97,13 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   const streamRef = useRef<MediaStream | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
-  const dateGroups = messages.reduce<{ label: string; messages: MessageRecord[] }[]>((groups, message) => {
+  const dateGroups = useMemo(() => messages.reduce<{ label: string; messages: MessageRecord[] }[]>((groups, message) => {
     const label = displayDateDivider(message.date, locale);
     const lastGroup = groups[groups.length - 1];
     if (lastGroup?.label === label) lastGroup.messages.push(message);
     else groups.push({ label, messages: [message] });
     return groups;
-  }, []);
+  }, []), [messages, locale]);
 
   useEffect(() => {
     let active = true;
@@ -336,3 +336,4 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   );
 }
 
+export default memo(MessageList);
