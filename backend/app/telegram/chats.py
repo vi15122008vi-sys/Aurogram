@@ -279,21 +279,33 @@ async def fetch_chat_history(
     return fetched
 
 
+AVATAR_TTL_SECONDS = 7 * 24 * 3600
+
+
 async def get_chat_avatar(account: dict, chat_id: int) -> Path | None:
-    """Аватар чата: скачивается один раз в media_data/avatars/{chat_id}.jpg."""
+    """Аватар чата: media_data/avatars/{account_id}/{chat_id}.jpg.
+
+    Путь изолирован по аккаунту (у разных аккаунтов свои фото и приватные чаты),
+    а файл старше 7 дней перекачивается — иначе смена фото в Telegram не видна.
+    """
+    import time
+
     from app.config import get_settings
 
-    avatars_dir = Path(get_settings().media_dir) / "avatars"
+    avatars_dir = Path(get_settings().media_dir) / "avatars" / str(account["id"])
     avatars_dir.mkdir(parents=True, exist_ok=True)
     target = avatars_dir / f"{chat_id}.jpg"
     if target.exists() and target.stat().st_size > 0:
-        return target
+        age = time.time() - target.stat().st_mtime
+        if age < AVATAR_TTL_SECONDS:
+            return target
 
     client = await get_client(account["id"], account)
     entity = await with_floodwait(lambda: client.get_entity(chat_id))
     photo = await with_floodwait(lambda: client.download_profile_photo(entity, file=bytes))
     if not photo:
-        return None
+        # Фото удалили — отдаём устаревшую копию, если она была.
+        return target if target.exists() and target.stat().st_size > 0 else None
     image = Image.open(io.BytesIO(photo)).convert("RGB")
     image.thumbnail((256, 256), Image.LANCZOS)
     image.save(target, format="JPEG", quality=86, optimize=True)

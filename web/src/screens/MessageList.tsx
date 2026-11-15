@@ -120,6 +120,29 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     return list;
   }, [dateGroups]);
 
+  // Медиа внутри сообщений грузится асинхронно: пересчитываем высоту ряда,
+  // иначе виртуальный список «дёргается» при появлении картинок/видео.
+  useEffect(() => {
+    const host = parentRef.current;
+    if (!host || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const row = (entry.target as HTMLElement).closest("[data-index]") as HTMLElement | null;
+        if (row) virtualizer.measureElement(row);
+      }
+    });
+    const observeMedia = () => {
+      host.querySelectorAll<HTMLElement>("img, video, audio, .glass-message").forEach((el) => observer.observe(el));
+    };
+    observeMedia();
+    const mutations = new MutationObserver(observeMedia);
+    mutations.observe(host, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      mutations.disconnect();
+    };
+  }, [virtualizer]);
+
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
@@ -327,7 +350,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
         {!loading && !messages.length && <p className="py-10 text-center text-sm text-muted">{t("Сообщений нет")}</p>}
         {activeDateLabel && (
           <div className="pointer-events-none sticky top-0 z-20 flex h-0 justify-center">
-            <span className="translate-y-1 rounded-full bg-surface/80 px-3 py-1 font-mono text-[9px] capitalize text-muted shadow-[0_6px_16px_rgb(0_0_0_/_12%),inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_5%,transparent)] backdrop-blur-[12px]">
+            <span className="pointer-events-none translate-y-1 select-none rounded-full bg-surface/80 px-3 py-1 font-mono text-[9px] capitalize text-muted shadow-[0_6px_16px_rgb(0_0_0_/_12%),inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_5%,transparent)] backdrop-blur-[12px]">
               {activeDateLabel}
             </span>
           </div>
