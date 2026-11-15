@@ -108,6 +108,50 @@ CORS_ORIGINS = [
 # allow_origin_regex намеренно убран: остаётся только явный список CORS_ORIGINS.
 # Превью-деплои (<hash>.aurogram.pages.dev) теперь НЕ допускаются — если они нужны,
 # добавляйте их в CORS_ORIGINS через переменную окружения.
+def _error_log_path() -> Path:
+    from app.config import get_settings
+
+    return Path(get_settings().cache_dir) / "error.log"
+
+
+def write_error_log(request: Request, exc: BaseException) -> None:
+    """Пишет ошибку в /app/cache_data/error.log (JSON-строки для админки)."""
+    import json
+    import traceback
+    from datetime import datetime, timezone
+
+    try:
+        path = _error_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "method": request.method,
+            "path": request.url.path,
+            "query": str(request.url.query),
+            "type": type(exc).__name__,
+            "message": str(exc)[:500],
+            "trace": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-4000:],
+        }
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as log_exc:  # логирование не должно ронять обработку
+        logging.getLogger("aurogram.errors").warning("error.log write failed: %s", log_exc)
+
+
+@app.middleware("http")
+async def error_logging_middleware(request: Request, call_next):  # noqa: ANN001
+    """Логирует необработанные исключения до того, как их отдаст CORS-слой.
+
+    Добавлен ДО CORSMiddleware, поэтому CORS остаётся самым внешним middleware
+    и заголовки попадают даже в 500-ответ.
+    """
+    try:
+        return await call_next(request)
+    except Exception as exc:  # noqa: BLE001
+        write_error_log(request, exc)
+        raise
+
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key or secrets.token_urlsafe(32),
@@ -161,6 +205,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     logging.getLogger("aurogram.errors").exception(
         "unhandled error on %s %s", request.method, request.url.path
     )
+    write_error_log(request, exc)
     origin = request.headers.get("origin", "")
     headers = (
         {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% block content %}
+<section class="mx-auto max-w-6xl">
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-rose-300/70">OPS / ERRORS</p>
+      <h1 class="mt-1 text-2xl font-semibold text-zinc-100">Ошибки бэкенда</h1>
+      <p class="mt-1 text-xs text-zinc-500">Последние 50 необработанных исключений из <code class="font-mono">{{ log_path }}</code>.</p>
+    </div>
+    <a href="/admin/errors" class="admin-btn">Обновить</a>
+  </div>
+
+  {% if entries %}
+  <div class="overflow-x-auto rounded-xl border border-white/10">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-white/5 text-[11px] uppercase tracking-wide text-zinc-500">
+        <tr><th class="p-3">Время (UTC)</th><th class="p-3">Тип</th><th class="p-3">Запрос</th><th class="p-3">Сообщение</th><th class="p-3">Стектрейс</th></tr>
+      </thead>
+      <tbody>
+        {% for row in entries %}
+        <tr class="border-t border-white/5 align-top">
+          <td class="whitespace-nowrap p-3 font-mono text-xs text-zinc-400">{{ row.ts }}</td>
+          <td class="p-3"><span class="rounded-full bg-rose-400/10 px-2 py-0.5 text-[11px] text-rose-300">{{ row.type }}</span></td>
+          <td class="p-3 font-mono text-xs text-zinc-300">{{ row.method }} {{ row.path }}</td>
+          <td class="max-w-xs p-3 text-xs text-zinc-300">{{ row.message }}</td>
+          <td class="p-3">
+            <details><summary class="cursor-pointer text-[11px] text-indigo-300">показать</summary>
+              <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-zinc-950/70 p-2 font-mono text-[10px] leading-4 text-zinc-400">{{ row.trace }}</pre>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">Ошибок не зафиксировано.</p>
+  {% endif %}
+</section>
+{% endblock %}

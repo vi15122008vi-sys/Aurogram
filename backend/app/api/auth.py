@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from fastapi.responses import JSONResponse
+from telethon.errors import AuthKeyUnregisteredError, SessionRevokedError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.deps import get_current_account, get_optional_account
@@ -23,6 +25,13 @@ from app.ratelimit import (
 from app.telegram import auth as telegram_auth
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _session_expired_response() -> JSONResponse:
+    """401 + удаление cookie: фронт не должен зацикливаться на мёртвом токене."""
+    response = JSONResponse(status_code=401, content={"detail": "Сессия истекла. Войдите заново"})
+    response.delete_cookie("auth_token", path="/")
+    return response
 
 
 def _set_auth_cookie(response: Response, request: Request, token: str | None) -> None:
@@ -95,14 +104,17 @@ async def send_code(
             detail="Неверный или отозванный код приглашения",
         )
 
-    result = await telegram_auth.send_code(
-        phone=_normalize_phone(payload.phone),
+    try:
+        result = await telegram_auth.send_code(
+            phone=_normalize_phone(payload.phone),
         force_method=payload.force_method,
-        account=account,
-        api_id=payload.api_id,
-        api_hash=payload.api_hash,
-        device_id=request.headers.get("x-device-id", "default"),
-    )
+            account=account,
+            api_id=payload.api_id,
+            api_hash=payload.api_hash,
+            device_id=request.headers.get("x-device-id", "default"),
+        )
+    except (AuthKeyUnregisteredError, SessionRevokedError):
+        return _session_expired_response()
     _set_auth_cookie(response, request, result.get("token"))
     await mark_invite_used(invite_code, _normalize_phone(payload.phone))
     return _auth_payload(result)
@@ -119,14 +131,17 @@ async def sign_in(
     normalized_phone = _normalize_phone(payload.phone)
     if account and account.get("phone") not in {"", normalized_phone}:
         raise HTTPException(status_code=403, detail="Номер не совпадает с текущей сессией")
-    result = await telegram_auth.sign_in(
-        phone=normalized_phone,
+    try:
+        result = await telegram_auth.sign_in(
+            phone=normalized_phone,
         phone_code_hash=payload.phone_code_hash,
         code=payload.code,
-        password=payload.password,
-        account_id=account["id"] if account else None,
-        device_id=request.headers.get("x-device-id", "default"),
-    )
+            password=payload.password,
+            account_id=account["id"] if account else None,
+            device_id=request.headers.get("x-device-id", "default"),
+        )
+    except (AuthKeyUnregisteredError, SessionRevokedError):
+        return _session_expired_response()
     _set_auth_cookie(response, request, result.get("token"))
     return _auth_payload(result)
 

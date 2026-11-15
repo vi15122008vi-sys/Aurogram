@@ -40,6 +40,7 @@ PAGES = {
     "export": "Экспорт",
     "system": "Система",
     "logs": "Журнал",
+    "errors": "Ошибки",
     "antispam": "Антиспам",
     "stopwords": "Стоп-слова",
     "editor": "Редактор",
@@ -398,6 +399,25 @@ async def _page_data(page: str) -> dict[str, Any]:
                ORDER BY cs.updated_at DESC LIMIT 300"""
         )
         return {"rows": [dict(row) for row in rows]}
+    if page == "errors":
+        import json
+        from pathlib import Path
+
+        from app.config import get_settings
+
+        path = Path(get_settings().cache_dir) / "error.log"
+        entries: list[dict[str, Any]] = []
+        if path.exists():
+            lines = path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-200:]
+            for line in reversed(lines):
+                try:
+                    entries.append(json.loads(line))
+                except ValueError:
+                    continue
+                if len(entries) >= 50:
+                    break
+        return {"entries": entries, "log_path": str(path)}
+
     if page == "invites":
         return {"codes": await invite_list(), "master_code": invite_master()}
     if page == "bots":

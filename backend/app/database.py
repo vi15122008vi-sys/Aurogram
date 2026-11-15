@@ -202,6 +202,9 @@ def meta_db_path() -> Path:
     explicit = (os.environ.get("DB_PATH") or os.environ.get("DATABASE_PATH") or "").strip()
     if explicit:
         path = Path(explicit)
+        if not path.is_absolute():
+            # относительный путь в контейнере = нестабильное место, делаем абсолютным
+            path = (Path("/app") / path).resolve() if os.name != "nt" else path.resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -226,6 +229,7 @@ async def connect(path: Optional[Path] = None) -> aiosqlite.Connection:
 
 
 async def init_db() -> None:
+    log.info("meta db: %s", meta_db_path())
     settings = get_settings()
     Path(settings.sessions_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.cache_dir).mkdir(parents=True, exist_ok=True)
