@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Bot, MessageCircle, Radio, RefreshCw } from "lucide-react";
 import { ApiError, api, type AuthAccount, type BotRecord, type ChatRecord } from "../lib/api";
 import type { AppTab } from "../components/BottomNav";
@@ -54,6 +54,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authExpired, setAuthExpired] = useState(false);
+  const handleArchive = useCallback((chat: ChatRecord) => void toggleChatArchive(chat), [toggleChatArchive]);
   const [offline, setOffline] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const chatMode = tab === "chats" && chatFilter === "archive" ? "archive" : "active";
@@ -143,7 +144,7 @@ export function Workspace({ tab, account, onLogout }: WorkspaceProps) {
         </section>
       );
     }
-    return <ChatList authExpired={authExpired} chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={(chat) => void toggleChatArchive(chat)} archivingId={archivingId} loading={loading} error={error} offline={offline} />;
+    return <ChatList authExpired={authExpired} chats={rows as ChatRecord[]} filter={chatFilter} onFilterChange={setChatFilter} onOpen={setSelectedChat} onArchive={handleArchive} archivingId={archivingId} loading={loading} error={error} offline={offline} />;
   }
 
   const content = tabContent[tab as keyof typeof tabContent];

@@ -1,4 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { motion } from "framer-motion";
 import { ArrowDownToLine, LoaderCircle, Pin, PinOff, Send, StopCircle, Video } from "lucide-react";
 import { ApiError, api, type MessageRecord } from "../lib/api";
@@ -97,6 +98,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
   const streamRef = useRef<MediaStream | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+
   const dateGroups = useMemo(() => messages.reduce<{ label: string; messages: MessageRecord[] }[]>((groups, message) => {
     const label = displayDateDivider(message.date, locale);
     const lastGroup = groups[groups.length - 1];
@@ -104,6 +106,36 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     else groups.push({ label, messages: [message] });
     return groups;
   }, []), [messages, locale]);
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Плоский список строк для виртуализации: разделители дат + сообщения.
+  const rows = useMemo(() => {
+    const list: ({ kind: "divider"; key: string; label: string } | { kind: "message"; key: string; message: MessageRecord })[] = [];
+    for (const group of dateGroups) {
+      list.push({ kind: "divider", key: `d:${group.label}`, label: group.label });
+      for (const message of group.messages) {
+        list.push({ kind: "message", key: `m:${message.chat_id}:${message.id}`, message });
+      }
+    }
+    return list;
+  }, [dateGroups]);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 88,
+    overscan: 8,
+  });
+
+  // Чат открывается на последнем сообщении (новые внизу).
+  useEffect(() => {
+    if (!rows.length) return;
+    const id = window.setTimeout(() => {
+      virtualizer.scrollToIndex(rows.length - 1, { align: "end" });
+    }, 40);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows.length]);
 
   useEffect(() => {
     let active = true;
@@ -156,7 +188,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     streamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
 
-  async function loadOlder() {
+  const loadOlder = useCallback(async () => {
     const offsetId = messages[0]?.id;
     if (!offsetId || loadingOlder) return;
     setLoadingOlder(true);
@@ -170,9 +202,8 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     } finally {
       setLoadingOlder(false);
     }
-  }
-
-  async function send(event: FormEvent<HTMLFormElement>) {
+  }, [chatId, pageSize, messages.length]);
+  const send = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const body = text.trim();
     if (!body || sending) return;
@@ -188,8 +219,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     } finally {
       setSending(false);
     }
-  }
-
+  }, [text, chatId, allowSend]);
   async function chooseReaction(messageId: number, emoji: "👍" | "❤️" | "🔥" | "😂") {
     setError(null);
     try {
@@ -257,7 +287,7 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
     <section className="glass-panel overflow-hidden rounded-[26px]">
       {hasMore && <div className="p-2 text-center shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--ink)_4%,transparent)]"><button type="button" onClick={loadOlder} disabled={loadingOlder} className="inline-flex h-8 items-center gap-2 rounded-full bg-surface/60 px-3.5 text-xs font-medium text-muted hover:text-ink disabled:opacity-50"><ArrowDownToLine size={14} />{loadingOlder ? t("Загружаем…") : t("Загрузить предыдущие")}</button></div>}
       {offline && <div className="px-3 pt-3"><OfflineBanner /></div>}
-      <div className="max-h-[55vh] min-h-48 space-y-3 overflow-y-auto bg-black/[0.06] p-3 sm:p-4">
+      <div ref={parentRef} className="max-h-[55vh] min-h-48 overflow-y-auto bg-black/[0.06] p-3 sm:p-4">
         {loading && !messages.length && (
           <div className="space-y-3" aria-busy="true" aria-live="polite" aria-label={t("Загружаем сообщения", "Loading messages")}>
             {[62, 44, 72, 38, 55].map((width, index) => (
@@ -272,35 +302,46 @@ export function MessageList({ chatId, allowSend = false, pageSize = 50 }: Messag
         )}
         {loading && !!messages.length && <div className="flex justify-center py-3 text-muted"><LoaderCircle size={16} className="animate-spin" /></div>}
         {!loading && !messages.length && <p className="py-10 text-center text-sm text-muted">{t("Сообщений нет")}</p>}
-        {dateGroups.map((group) => (
-          <div key={group.label}>
-            <div className="sticky top-0 z-10 flex justify-center py-1"><span className="rounded-full bg-surface/70 px-3 py-1 font-mono text-[9px] capitalize text-muted shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]">{group.label}</span></div>
-            <div className="space-y-3 pt-2">
-              {group.messages.map((message) => (
-                <motion.article key={`${message.chat_id}:${message.id}`} onDoubleClick={() => setReactionTarget(message.id)} initial={message.id === lastSentId ? { opacity: 0, scale: 0.96, y: 6 } : false} animate={message.id === lastSentId ? { opacity: 1, scale: [0.96, 1.02, 1], y: 0 } : undefined} transition={message.id === lastSentId ? { duration: 0.34, ease: [0.2, 0.85, 0.3, 1] } : undefined} onAnimationComplete={() => { if (message.id === lastSentId) setLastSentId(null); }} className={`flex ${message.out ? "justify-end" : "justify-start"}`}>
-                  <div className={`glass-hover glass-message max-w-[88%] min-w-[min(16rem,88%)] rounded-[20px] px-3.5 py-2.5 sm:max-w-[76%] ${message.out ? "glass-message-out rounded-br-[8px]" : "glass-message-in rounded-bl-[8px]"}`}>
-                    {!message.out && message.sender_name && <p className="mb-1 text-[10px] font-semibold text-accent">{message.sender_name}</p>}
-                    {message.text && <p className="whitespace-pre-wrap break-words text-sm leading-5 text-ink">{message.text}</p>}
-                    {message.media_type === "video_note" && <VideoNotePlayer chatId={chatId} messageId={message.id} />}
-                    {message.media_type === "voice" && <VoicePlayer chatId={chatId} messageId={message.id} durationHint={message.duration} waveform={message.waveform_data} />}
-                    {message.media_type && message.media_type !== "voice" && message.media_type !== "video_note" && (
-                      <button type="button" onClick={() => void saveMedia(chatId, message.id).catch((cause: unknown) => setError(t(cause instanceof Error ? cause.message : "Не удалось скачать медиа")))} className="mt-2 inline-flex h-8 items-center gap-2 rounded-full bg-surface/60 px-3 text-xs text-muted hover:text-ink">
-                        <ArrowDownToLine size={13} />{t("Скачать")} {t(message.media_type)}
-                      </button>
-                    )}
-                    {!!message.reactions?.length && <div className="mt-2 flex flex-wrap gap-1">{message.reactions.map((reaction) => <span key={reaction.emoji} className={`rounded-full px-2 py-0.5 text-xs ${reaction.chosen ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_25%,transparent)]" : "bg-surface/60 text-ink shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]"}`}>{reaction.emoji} {reaction.count}</span>)}</div>}
-                    {reactionTarget === message.id && <div className="mt-2 flex gap-1 rounded-full bg-surface/90 p-1 shadow-[0_10px_28px_rgb(0_0_0_/_18%),inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]" aria-label={t("Выберите реакцию")}>{(["👍", "❤️", "🔥", "😂"] as const).map((emoji) => <motion.button key={emoji} type="button" whileTap={springPress} aria-label={emoji} onClick={() => void chooseReaction(message.id, emoji)} className="grid size-8 place-items-center rounded-full text-lg transition hover:bg-accent/15">{emoji}</motion.button>)}</div>}
-                    <div className="mt-1.5 flex items-center justify-end gap-2">
-                      {allowSend && <motion.button type="button" whileTap={springPress} onClick={() => void togglePinned(message)} aria-label={t(message.pinned ? "Открепить сообщение" : "Закрепить сообщение")} title={t(message.pinned ? "Открепить сообщение" : "Закрепить сообщение")} className={`grid size-6 place-items-center rounded-full transition ${message.pinned ? "text-accent" : "text-muted hover:text-accent"}`}>{message.pinned ? <PinOff size={12} /> : <Pin size={12} />}</motion.button>}
-                      {message.pinned && <span className="font-mono text-[9px] text-accent">{t("Закреплено")}</span>}
-                      <p className="font-mono text-[9px] tabular-nums text-muted">{displayDate(message.date, locale)}</p>
-                    </div>
-                  </div>
-                </motion.article>
-              ))}
-            </div>
+        {!!rows.length && (
+          <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              return (
+                <div
+                  key={row.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{ position: "absolute", top: 0, left: 0, right: 0, transform: `translateY(${virtualRow.start}px)` }}
+                >
+                  {row.kind === "divider" ? (
+                    <div className="flex justify-center py-1"><span className="rounded-full bg-surface/70 px-3 py-1 font-mono text-[9px] capitalize text-muted shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]">{row.label}</span></div>
+                  ) : (
+                    <div className="pb-3">{<motion.article onDoubleClick={() => setReactionTarget(row.message.id)} initial={row.message.id === lastSentId ? { opacity: 0, scale: 0.96, y: 6 } : false} animate={row.message.id === lastSentId ? { opacity: 1, scale: [0.96, 1.02, 1], y: 0 } : undefined} transition={row.message.id === lastSentId ? { duration: 0.34, ease: [0.2, 0.85, 0.3, 1] } : undefined} onAnimationComplete={() => { if (row.message.id === lastSentId) setLastSentId(null); }} className={`flex ${row.message.out ? "justify-end" : "justify-start"}`}>
+  <div className={`glass-hover glass-message max-w-[88%] min-w-[min(16rem,88%)] rounded-[20px] px-3.5 py-2.5 sm:max-w-[76%] ${row.message.out ? "glass-message-out rounded-br-[8px]" : "glass-message-in rounded-bl-[8px]"}`}>
+    {!row.message.out && row.message.sender_name && <p className="mb-1 text-[10px] font-semibold text-accent">{row.message.sender_name}</p>}
+    {row.message.text && <p className="whitespace-pre-wrap break-words text-sm leading-5 text-ink">{row.message.text}</p>}
+    {row.message.media_type === "video_note" && <VideoNotePlayer chatId={chatId} messageId={row.message.id} />}
+    {row.message.media_type === "voice" && <VoicePlayer chatId={chatId} messageId={row.message.id} durationHint={row.message.duration} waveform={row.message.waveform_data} />}
+    {row.message.media_type && row.message.media_type !== "voice" && row.message.media_type !== "video_note" && (
+      <button type="button" onClick={() => void saveMedia(chatId, row.message.id).catch((cause: unknown) => setError(t(cause instanceof Error ? cause.message : "Не удалось скачать медиа")))} className="mt-2 inline-flex h-8 items-center gap-2 rounded-full bg-surface/60 px-3 text-xs text-muted hover:text-ink">
+        <ArrowDownToLine size={13} />{t("Скачать")} {t(row.message.media_type)}
+      </button>
+    )}
+    {!!row.message.reactions?.length && <div className="mt-2 flex flex-wrap gap-1">{row.message.reactions.map((reaction) => <span key={reaction.emoji} className={`rounded-full px-2 py-0.5 text-xs ${reaction.chosen ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_25%,transparent)]" : "bg-surface/60 text-ink shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]"}`}>{reaction.emoji} {reaction.count}</span>)}</div>}
+    {reactionTarget === row.message.id && <div className="mt-2 flex gap-1 rounded-full bg-surface/90 p-1 shadow-[0_10px_28px_rgb(0_0_0_/_18%),inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_4%,transparent)]" aria-label={t("Выберите реакцию")}>{(["👍", "❤️", "🔥", "😂"] as const).map((emoji) => <motion.button key={emoji} type="button" whileTap={springPress} aria-label={emoji} onClick={() => void chooseReaction(row.message.id, emoji)} className="grid size-8 place-items-center rounded-full text-lg transition hover:bg-accent/15">{emoji}</motion.button>)}</div>}
+    <div className="mt-1.5 flex items-center justify-end gap-2">
+      {allowSend && <motion.button type="button" whileTap={springPress} onClick={() => void togglePinned(row.message)} aria-label={t(row.message.pinned ? "Открепить сообщение" : "Закрепить сообщение")} title={t(row.message.pinned ? "Открепить сообщение" : "Закрепить сообщение")} className={`grid size-6 place-items-center rounded-full transition ${row.message.pinned ? "text-accent" : "text-muted hover:text-accent"}`}>{row.message.pinned ? <PinOff size={12} /> : <Pin size={12} />}</motion.button>}
+      {row.message.pinned && <span className="font-mono text-[9px] text-accent">{t("Закреплено")}</span>}
+      <p className="font-mono text-[9px] tabular-nums text-muted">{displayDate(row.message.date, locale)}</p>
+    </div>
+  </div>
+</motion.article>}</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        ))}
+        )}
       </div>
       {retryLeft > 0 && (
         <div role="status" className="mx-3 mb-3 rounded-[16px] bg-warning/10 px-3 py-2 text-xs text-warning">

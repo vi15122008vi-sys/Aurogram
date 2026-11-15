@@ -4,14 +4,15 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: "esnext",
+    target: "es2020",
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom"],
-          motion: ["framer-motion"],
-          icons: ["lucide-react"],
-          markdown: ["react-markdown"],
+        // Функциональная стратегия: каждый пакет из node_modules → свой чанк.
+        // Так Rollup не создаёт circular chunks и кэш не инвалидируется целиком.
+        manualChunks(id: string) {
+          if (id.includes("node_modules")) {
+            return id.toString().split("node_modules/")[1].split("/")[0].toString();
+          }
         },
       },
     },
