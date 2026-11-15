@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
+    environment:
+      DB_PATH: /app/cache_data/_index.db
     expose:
       - "8000"
     volumes:

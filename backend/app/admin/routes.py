@@ -408,7 +408,10 @@ async def _page_data(page: str) -> dict[str, Any]:
         path = Path(get_settings().cache_dir) / "error.log"
         entries: list[dict[str, Any]] = []
         if path.exists():
-            lines = path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-200:]
+            from collections import deque
+
+            with path.open("r", encoding="utf-8", errors="replace") as handle:
+                lines = [line.rstrip("\n") for line in deque(handle, maxlen=200) if line.strip()]
             for line in reversed(lines):
                 try:
                     entries.append(json.loads(line))

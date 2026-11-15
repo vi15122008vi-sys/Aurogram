@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
+from telethon.errors import AuthKeyUnregisteredError, SessionRevokedError
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -108,34 +109,81 @@ CORS_ORIGINS = [
 # allow_origin_regex намеренно убран: остаётся только явный список CORS_ORIGINS.
 # Превью-деплои (<hash>.aurogram.pages.dev) теперь НЕ допускаются — если они нужны,
 # добавляйте их в CORS_ORIGINS через переменную окружения.
+_error_logger: logging.Logger | None = None
+
+
 def _error_log_path() -> Path:
     from app.config import get_settings
 
     return Path(get_settings().cache_dir) / "error.log"
 
 
-def write_error_log(request: Request, exc: BaseException) -> None:
-    """Пишет ошибку в /app/cache_data/error.log (JSON-строки для админки)."""
+def error_logger() -> logging.Logger:
+    """Логгер ошибок с ротацией: 5 МБ × 3 файла, не переполняет диск."""
+    global _error_logger
+    if _error_logger is not None:
+        return _error_logger
+
+    from logging.handlers import RotatingFileHandler
+
+    log_path = _error_log_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger("aurogram.errorlog")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    if not logger.handlers:
+        handler = RotatingFileHandler(log_path, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(handler)
+    _error_logger = logger
+    return logger
+
+
+def emit_error_entry(  # noqa: PLR0913
+    *,
+    level: str,
+    method: str,
+    path: str,
+    query: str = "",
+    error_type: str,
+    message: str,
+    trace: str = "",
+) -> None:
+    """Пишет JSON-строку в error.log (её же читает админка)."""
     import json
-    import traceback
     from datetime import datetime, timezone
 
     try:
-        path = _error_log_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "method": request.method,
-            "path": request.url.path,
-            "query": str(request.url.query),
-            "type": type(exc).__name__,
-            "message": str(exc)[:500],
-            "trace": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-4000:],
+            "level": level,
+            "method": method,
+            "path": path,
+            "query": query,
+            "type": error_type,
+            "message": message[:500],
+            "trace": trace[-4000:],
         }
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        error_logger().info(json.dumps(entry, ensure_ascii=False))
     except Exception as log_exc:  # логирование не должно ронять обработку
         logging.getLogger("aurogram.errors").warning("error.log write failed: %s", log_exc)
+
+
+def write_error_log(request: Request, exc: BaseException) -> None:
+    import traceback
+
+    emit_error_entry(
+        level="ERROR",
+        method=request.method,
+        path=request.url.path,
+        query=str(request.url.query),
+        error_type=type(exc).__name__,
+        message=str(exc),
+        trace="".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+    )
+
+
+WARN_STATUSES = {401, 403, 422, 429}
 
 
 @app.middleware("http")
@@ -146,10 +194,42 @@ async def error_logging_middleware(request: Request, call_next):  # noqa: ANN001
     и заголовки попадают даже в 500-ответ.
     """
     try:
-        return await call_next(request)
+        response = await call_next(request)
     except Exception as exc:  # noqa: BLE001
         write_error_log(request, exc)
         raise
+    if response.status_code in WARN_STATUSES:
+        emit_error_entry(
+            level="WARN",
+            method=request.method,
+            path=request.url.path,
+            query=str(request.url.query),
+            error_type=f"HTTP {response.status_code}",
+            message=response.headers.get("retry-after", "") or "",
+        )
+    return response
+
+
+@app.exception_handler(AuthKeyUnregisteredError)
+async def auth_key_unregistered_handler(request: Request, exc: AuthKeyUnregisteredError) -> JSONResponse:
+    write_error_log(request, exc)
+    return _session_expired_response()
+
+
+@app.exception_handler(SessionRevokedError)
+async def session_revoked_handler(request: Request, exc: SessionRevokedError) -> JSONResponse:
+    write_error_log(request, exc)
+    return _session_expired_response()
+
+
+def _session_expired_response() -> JSONResponse:
+    response = JSONResponse(
+        status_code=401,
+        content={"detail": "Сессия истекла. Войдите заново"},
+        headers={"Access-Control-Allow-Credentials": "true"},
+    )
+    response.delete_cookie("auth_token", path="/")
+    return response
 
 
 app.add_middleware(

@@ -13,13 +13,13 @@
   <div class="overflow-x-auto rounded-xl border border-white/10">
     <table class="w-full text-left text-sm">
       <thead class="bg-white/5 text-[11px] uppercase tracking-wide text-zinc-500">
-        <tr><th class="p-3">Время (UTC)</th><th class="p-3">Тип</th><th class="p-3">Запрос</th><th class="p-3">Сообщение</th><th class="p-3">Стектрейс</th></tr>
+        <tr><th class="p-3">Время (UTC)</th><th class="p-3">Уровень / тип</th><th class="p-3">Запрос</th><th class="p-3">Сообщение</th><th class="p-3">Стектрейс</th></tr>
       </thead>
       <tbody>
         {% for row in entries %}
         <tr class="border-t border-white/5 align-top">
           <td class="whitespace-nowrap p-3 font-mono text-xs text-zinc-400">{{ row.ts }}</td>
-          <td class="p-3"><span class="rounded-full bg-rose-400/10 px-2 py-0.5 text-[11px] text-rose-300">{{ row.type }}</span></td>
+          <td class="p-3"><span class="rounded-full {% if row.level == 'WARN' %}bg-amber-400/10 text-amber-300{% else %}bg-rose-400/10 text-rose-300{% endif %} px-2 py-0.5 text-[11px]">{{ row.level or 'ERROR' }} · {{ row.type }}</span></td>
           <td class="p-3 font-mono text-xs text-zinc-300">{{ row.method }} {{ row.path }}</td>
           <td class="max-w-xs p-3 text-xs text-zinc-300">{{ row.message }}</td>
           <td class="p-3">
