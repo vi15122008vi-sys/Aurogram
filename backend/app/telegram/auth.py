@@ -367,6 +367,7 @@ async def sign_in(
             if not password:
                 return {
                     "need_password": True,
+                    "auth_state": "pending",
                     "account_id": account["id"],
                     "token": await _ensure_token(account),
                 }
@@ -430,12 +431,25 @@ async def sign_in(
         safe_device_id = "".join(c for c in device_id if c.isalnum() or c in "-_")[:80] or "default"
         await execute("INSERT OR IGNORE INTO account_devices (account_id, device_id) VALUES (?, ?)", (account["id"], safe_device_id))
         secure_session_file(session_path(account["id"], device_id))
+        # Проверяем, что статус реально записался: иначе аккаунт навсегда остаётся
+        # в 'pending', listener его не берёт и accounts_alive = 0.
+        saved = await fetchone("SELECT auth_state FROM accounts WHERE id = ?", (account["id"],))
+        if not saved or saved["auth_state"] != "ok":
+            log.warning(
+                "sign_in: auth_state не стал 'ok' для %s (было %s) — повторяем UPDATE по phone",
+                account["id"][:8],
+                saved["auth_state"] if saved else "none",
+            )
+            await execute("UPDATE accounts SET auth_state = 'ok' WHERE phone = ?", (phone,))
+            await execute("UPDATE accounts SET auth_state = 'ok' WHERE id = ?", (account["id"],))
+
         return {
             "need_password": False,
             "account_id": account["id"],
             "token": await _ensure_token(account),
             "name": name,
             "username": username,
+            "auth_state": "ok",
         }
     finally:
         pass

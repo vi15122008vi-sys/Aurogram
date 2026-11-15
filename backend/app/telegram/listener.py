@@ -247,6 +247,12 @@ async def main() -> None:
     try:
         while True:
             rows = await fetchall("SELECT accounts.*, account_devices.device_id FROM accounts JOIN account_devices ON account_devices.account_id = accounts.id WHERE accounts.auth_state = 'ok'")
+            if not rows:
+                states = await fetchall("SELECT auth_state, COUNT(*) AS c FROM accounts GROUP BY auth_state")
+                log.warning(
+                    "listener: нет аккаунтов с auth_state='ok' (состояния: %s)",
+                    ", ".join(f"{item['auth_state']}×{item['c']}" for item in states) or "таблица пуста",
+                )
             alive_ids = {f"{r['id']}:{r['device_id']}" for r in rows}
             for session_key, task in list(running.items()):
                 if session_key not in alive_ids or task.done():
