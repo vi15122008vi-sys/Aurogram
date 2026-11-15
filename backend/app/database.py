@@ -194,9 +194,23 @@ CREATE TABLE IF NOT EXISTS channel_integrations (
 
 
 def meta_db_path() -> Path:
-    settings = get_settings()
-    root = Path(settings.cache_dir)
+    """Путь к служебной БД (аккаунты, настройки, виджеты).
+
+    Порядок: DB_PATH из окружения → legacy-файлы рядом с CACHE_DIR
+    (_index.db, затем _meta.db) → _meta.db по умолчанию.
+    """
+    explicit = (os.environ.get("DB_PATH") or os.environ.get("DATABASE_PATH") or "").strip()
+    if explicit:
+        path = Path(explicit)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    root = Path(get_settings().cache_dir)
     root.mkdir(parents=True, exist_ok=True)
+    for legacy in ("_index.db", "_meta.db"):
+        candidate = root / legacy
+        if candidate.exists():
+            return candidate
     return root / "_meta.db"
 
 
@@ -224,24 +238,27 @@ async def init_db() -> None:
             "SELECT id, 'default' FROM accounts WHERE auth_state = 'ok'"
         )
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_phone ON accounts(phone)")
-        # Старые базы не знают про настройки внешнего вида/AI — добавляем колонки на лету.
-        prefs_cursor = await conn.execute("PRAGMA table_info(account_preferences)")
-        pref_columns = {row["name"] for row in await prefs_cursor.fetchall()}
-        accounts_cursor = await conn.execute("PRAGMA table_info(accounts)")
-        account_columns = {row["name"] for row in await accounts_cursor.fetchall()}
-        if "tg_user_id" not in account_columns:
-            await conn.execute("ALTER TABLE accounts ADD COLUMN tg_user_id INTEGER")
-        if "settings_json" not in account_columns:
-            await conn.execute("ALTER TABLE accounts ADD COLUMN settings_json TEXT DEFAULT '{}'")
-        for column, ddl in {
-            "density": "TEXT DEFAULT 'comfortable'",
-            "card_style": "TEXT DEFAULT 'glass'",
-            "ai_translate": "INTEGER NOT NULL DEFAULT 0",
-            "ai_reply_style": "TEXT DEFAULT 'brief'",
-            "energy_save": "INTEGER NOT NULL DEFAULT 0",
-        }.items():
-            if column not in pref_columns:
-                await conn.execute(f"ALTER TABLE account_preferences ADD COLUMN {column} {ddl}")
+        # Старые базы не знают про новые колонки — добавляем на лету.
+        try:
+            prefs_cursor = await conn.execute("PRAGMA table_info(account_preferences)")
+            pref_columns = {row["name"] for row in await prefs_cursor.fetchall()}
+            accounts_cursor = await conn.execute("PRAGMA table_info(accounts)")
+            account_columns = {row["name"] for row in await accounts_cursor.fetchall()}
+            if "tg_user_id" not in account_columns:
+                await conn.execute("ALTER TABLE accounts ADD COLUMN tg_user_id INTEGER")
+            if "settings_json" not in account_columns:
+                await conn.execute("ALTER TABLE accounts ADD COLUMN settings_json TEXT DEFAULT '{}'")
+            for column, ddl in {
+                "density": "TEXT DEFAULT 'comfortable'",
+                "card_style": "TEXT DEFAULT 'glass'",
+                "ai_translate": "INTEGER NOT NULL DEFAULT 0",
+                "ai_reply_style": "TEXT DEFAULT 'brief'",
+                "energy_save": "INTEGER NOT NULL DEFAULT 0",
+            }.items():
+                if column not in pref_columns:
+                    await conn.execute(f"ALTER TABLE account_preferences ADD COLUMN {column} {ddl}")
+        except Exception as exc:  # миграция не должна мешать созданию таблиц
+            log.warning("migration failed: %s", exc)
         # Уникальность номера включаем только после чистки дублей
         # (scripts/cleanup_duplicates.py): иначе индекс не создастся и старт упадёт.
         duplicates = await conn.execute(
