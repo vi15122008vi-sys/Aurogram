@@ -399,14 +399,6 @@ async def _page_data(page: str) -> dict[str, Any]:
                ORDER BY cs.updated_at DESC LIMIT 300"""
         )
         return {"rows": [dict(row) for row in rows]}
-    if page == "errors":
-        from app.applog import read_tail
-
-        entries = read_tail(limit=50)
-        from app.applog import log_file
-
-        return {"entries": entries, "log_path": str(log_file("ERROR"))}
-
     if page == "invites":
         return {"codes": await invite_list(), "master_code": invite_master()}
     if page == "bots":
@@ -1075,6 +1067,26 @@ async def admin_invite_delete_form(request: Request, code_id: int) -> Response:
         return RedirectResponse("/admin/login", status_code=303)
     await invite_delete(code_id)
     return RedirectResponse("/admin/invites", status_code=303)
+
+
+@router.get("/errors", response_class=HTMLResponse)
+async def admin_errors(
+    request: Request,
+    level: str = Query(default=""),
+    source: str = Query(default=""),
+) -> Response:
+    """Страница ошибок с фильтрами по уровню (WARN/ERROR) и источнику (http/listener)."""
+    if not _admin_session(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    from app.applog import log_file_for, read_tail
+
+    entries = read_tail(limit=50, level=level or None, source=source or None)
+    return _page_response(request, "errors", {
+        "entries": entries,
+        "level": level.upper(),
+        "source": source,
+        "log_path": str(log_file_for(level)),
+    })
 
 
 @router.get("/{page}", response_class=HTMLResponse)

@@ -4,22 +4,44 @@
     <div>
       <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-rose-300/70">OPS / ERRORS</p>
       <h1 class="mt-1 text-2xl font-semibold text-zinc-100">Ошибки бэкенда</h1>
-      <p class="mt-1 text-xs text-zinc-500">Последние 50 необработанных исключений из <code class="font-mono">{{ log_path }}</code>.</p>
+      <p class="mt-1 text-xs text-zinc-500">Последние {{ entries|length }} записей · <code class="font-mono">{{ log_path }}</code></p>
     </div>
-    <a href="/admin/errors" class="admin-btn">Обновить</a>
+    <form method="get" action="/admin/errors" class="flex flex-wrap items-end gap-2">
+      <label class="grid gap-1 text-[10px] uppercase tracking-wide text-zinc-500">
+        Уровень
+        <select name="level" class="h-9 rounded-lg border border-white/10 bg-zinc-950/70 px-2 text-sm text-zinc-100">
+          <option value="" {{ 'selected' if not level else '' }}>Все</option>
+          <option value="ERROR" {{ 'selected' if level == 'ERROR' else '' }}>ERROR</option>
+          <option value="WARN" {{ 'selected' if level == 'WARN' else '' }}>WARN</option>
+        </select>
+      </label>
+      <label class="grid gap-1 text-[10px] uppercase tracking-wide text-zinc-500">
+        Источник
+        <select name="source" class="h-9 rounded-lg border border-white/10 bg-zinc-950/70 px-2 text-sm text-zinc-100">
+          <option value="" {{ 'selected' if not source else '' }}>Все</option>
+          <option value="http" {{ 'selected' if source == 'http' else '' }}>API</option>
+          <option value="listener" {{ 'selected' if source == 'listener' else '' }}>Listener</option>
+        </select>
+      </label>
+      <button type="submit" class="admin-btn h-9">Показать</button>
+      <a href="/admin/errors" class="admin-btn h-9">Сбросить</a>
+    </form>
   </div>
 
   {% if entries %}
   <div class="overflow-x-auto rounded-xl border border-white/10">
     <table class="w-full text-left text-sm">
       <thead class="bg-white/5 text-[11px] uppercase tracking-wide text-zinc-500">
-        <tr><th class="p-3">Время (UTC)</th><th class="p-3">Уровень / тип</th><th class="p-3">Запрос</th><th class="p-3">Сообщение</th><th class="p-3">Стектрейс</th></tr>
+        <tr><th class="p-3">Время (UTC)</th><th class="p-3">Уровень / тип</th><th class="p-3">Источник</th><th class="p-3">Запрос</th><th class="p-3">Сообщение</th><th class="p-3">Стектрейс</th></tr>
       </thead>
       <tbody>
         {% for row in entries %}
         <tr class="border-t border-white/5 align-top">
           <td class="whitespace-nowrap p-3 font-mono text-xs text-zinc-400">{{ row.ts }}</td>
-          <td class="p-3"><span class="rounded-full {% if row.level == 'WARN' %}bg-amber-400/10 text-amber-300{% else %}bg-rose-400/10 text-rose-300{% endif %} px-2 py-0.5 text-[11px]">{{ row.level or 'ERROR' }} · {{ row.type }}</span></td>
+          <td class="p-3">
+            <span class="rounded-full px-2 py-0.5 text-[11px] {% if row.level == 'WARN' %}bg-amber-400/10 text-amber-300{% else %}bg-rose-400/10 text-rose-300{% endif %}">{{ row.level or 'ERROR' }} · {{ row.type }}</span>
+          </td>
+          <td class="p-3 font-mono text-[11px] text-zinc-400">{{ row.source or 'http' }}</td>
           <td class="p-3 font-mono text-xs text-zinc-300">{{ row.method }} {{ row.path }}</td>
           <td class="max-w-xs p-3 text-xs text-zinc-300">{{ row.message }}</td>
           <td class="p-3">
@@ -33,7 +55,7 @@
     </table>
   </div>
   {% else %}
-  <p class="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">Ошибок не зафиксировано.</p>
+  <p class="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">По выбранному фильтру записей нет.</p>
   {% endif %}
 </section>
 {% endblock %}

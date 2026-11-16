@@ -81,23 +81,55 @@ def emit_entry(  # noqa: PLR0913
         logging.getLogger("aurogram.errors").warning("log write failed: %s", exc)
 
 
-def read_tail(limit: int = 50) -> list[dict[str, Any]]:
-    """Последние записи из error.log и warn.log, свежие сверху (для админки)."""
-    from collections import deque
+TAIL_BYTES = 50 * 1024
 
+
+def _tail_lines(path: Path, max_bytes: int = TAIL_BYTES) -> list[str]:
+    """Последние строки файла без чтения целиком: seek в конец, читаем хвост."""
+    with path.open("rb") as handle:
+        handle.seek(0, 2)
+        size = handle.tell()
+        handle.seek(max(0, size - max_bytes))
+        data = handle.read()
+    lines = data.decode("utf-8", errors="replace").splitlines()
+    if size > max_bytes and lines:
+        lines = lines[1:]  # первая строка могла обрезаться посередине
+    return lines
+
+
+def read_tail(
+    limit: int = 50,
+    *,
+    level: str | None = None,
+    source: str | None = None,
+) -> list[dict[str, Any]]:
+    """Последние записи логов с фильтрацией по уровню и источнику.
+
+    level="WARN" читает только warn.log, level="ERROR" — только error.log,
+    без level — оба файла (свежие сверху).
+    """
+    normalized = (level or "").upper()
+    files = ["warn.log"] if normalized == "WARN" else ["error.log"] if normalized == "ERROR" else ["error.log", "warn.log"]
     entries: list[dict[str, Any]] = []
-    for filename in ("error.log", "warn.log"):
+    for filename in files:
         path = _cache_dir() / filename
         if not path.exists():
             continue
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            for line in deque(handle, maxlen=200):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entries.append(json.loads(line))
-                except ValueError:
-                    continue
+        for line in _tail_lines(path):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if source and str(entry.get("source") or "http") != source:
+                continue
+            entries.append(entry)
     entries.sort(key=lambda item: str(item.get("ts", "")), reverse=True)
     return entries[:limit]
+
+
+def log_file_for(level: str | None) -> Path:
+    """Путь к файлу, который соответствует выбранному уровню (для подсказки в UI)."""
+    return _cache_dir() / ("warn.log" if (level or "").upper() == "WARN" else "error.log")
