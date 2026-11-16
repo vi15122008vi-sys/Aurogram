@@ -48,3 +48,5 @@ Thumbs.db
 # временные артефакты тестов логирования
 scripts/.log-test/
 scripts/log-test/
+scripts/.log-tail-test/
+scripts/.log*-test/

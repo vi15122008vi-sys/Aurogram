@@ -81,7 +81,8 @@ def emit_entry(  # noqa: PLR0913
         logging.getLogger("aurogram.errors").warning("log write failed: %s", exc)
 
 
-TAIL_BYTES = 50 * 1024
+TAIL_BYTES = 128 * 1024
+FILTERED_TAIL_BYTES = 512 * 1024
 
 
 def _tail_lines(path: Path, max_bytes: int = TAIL_BYTES) -> list[str]:
@@ -111,11 +112,14 @@ def read_tail(
     normalized = (level or "").upper()
     files = ["warn.log"] if normalized == "WARN" else ["error.log"] if normalized == "ERROR" else ["error.log", "warn.log"]
     entries: list[dict[str, Any]] = []
+    # С фильтром читаем больший хвост: иначе редкие записи (например, listener)
+    # вытесняются потоком HTTP-ошибок и фильтр их не находит.
+    max_bytes = FILTERED_TAIL_BYTES if (level or source) else TAIL_BYTES
     for filename in files:
         path = _cache_dir() / filename
         if not path.exists():
             continue
-        for line in _tail_lines(path):
+        for line in _tail_lines(path, max_bytes=max_bytes):
             line = line.strip()
             if not line:
                 continue
